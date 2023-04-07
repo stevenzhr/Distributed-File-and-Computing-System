@@ -1,0 +1,94 @@
+syntax = "proto3";
+option go_package = "./utility";
+
+/* General request */
+message Request {
+    oneof req {
+        FileReq file_req = 1;
+        ChunkReq chunk_req = 2;
+        StatusReq status_req = 3;
+        JoinReq join_req = 4;
+    }
+}
+
+/* File request*/  
+message FileReq {
+    string req_type = 1;                // get, put, delete
+    File file_info = 2;
+}
+
+message File {
+    string filename = 1;
+    string checksum = 2;
+    uint64 file_size = 3;
+    uint64 chunk_size = 4;
+    repeated string chunk_node_list = 5;
+}
+
+/* Chunk request*/
+message ChunkReq {
+    bool getReq = 1;                    // Chunk request type: get(true)/put(false)
+    Chunk chunk_data = 2;
+}
+
+message Chunk {
+    string file_name = 1;               // Original filename + partition num
+    string checksum = 2;
+    uint64 size = 3;
+    repeated string piping_list = 4;
+    bytes data_stream = 5;
+}
+
+/* Status request*/
+message StatusReq {
+    string type = 1;
+    repeated string request_arg = 2;
+}
+
+/* Node join request*/
+message JoinReq {
+    string node_host_port = 1;
+}
+
+/* General response */
+message Response {
+    oneof res {
+        GeneralRes general_res = 1;
+        ChunkRes chunk_res = 2;
+        FileRes file_res = 3;
+    }
+}
+
+message GeneralRes {
+    string res_type = 1;                // accept, deny, queue
+    repeated string response_arg = 2;   // queue mode for first str: init, copyCnk, deleteCnk, shutdown
+}
+
+message ChunkRes {
+    bool status = 1;
+    Chunk chunk_data = 2;
+}
+
+message FileRes {       //used by controller response to client's get request
+    bool status = 1;
+    File file_data = 2;
+}
+
+/* Nodes heart beat message */
+message Heartbeat {
+    string node_id = 1;
+    string node_status = 2;
+    string timestemp = 3;
+    uint64 available_space = 4;
+    repeated string last_added_file_list = 5;
+    repeated string fail_task_list = 6;
+    uint64 request_count = 7;
+}
+
+message Wrapper {
+    oneof msg {
+        Request request_msg = 1;
+        Response response_msg = 2;
+        Heartbeat heartbeat_msg = 3;
+    }
+}
