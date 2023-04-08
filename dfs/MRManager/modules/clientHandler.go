@@ -59,8 +59,10 @@ func handleClientRequest(msgHandler *utility.MessageHandler) {
 }
 
 func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
-	// create empty response first
-	var generalRes utility.GeneralRes
+	// assume accept response for now
+	generalRes := utility.GeneralRes{
+		ResType: "accept",
+	}
 	// save so file to temp
 	soData := mapredReq.GetSoChunk().GetDataStream()
 	fileName := mapredReq.GetInputFile().GetFilename() + "_mr.so"
@@ -82,14 +84,14 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 		os.Remove(filePath)
 		log.Println("WARNING: Checksum unmatched, delete local chunk file. ")
 		log.Printf("LOG: Checksum: local(%s) vs req(%s) \n", checksum, mapredReq.GetSoChunk().GetChecksum())
+		generalRes = utility.GeneralRes{
+			ResType: "deny",
+		}
 	} else {
 		log.Printf("LOG: Successful retrieve .so file(%s). \n", fileName)
 	}
 	// TODO: add process map & reduce
 
-	generalRes = utility.GeneralRes{
-		ResType: "accept",
-	}
 	return &utility.Wrapper{
 		Msg: &utility.Wrapper_ResponseMsg{
 			ResponseMsg: &utility.Response{

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strconv"
-	"strings"
 )
 
 func ListFile(reqStr []string) bool {
@@ -162,18 +160,8 @@ func isFileExist(fileName string) (*utility.File, error) {
 	case "accept":
 		responseArgs := resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()
 		log.Println("LOG: accept response. Args type: ", responseArgs[0])
-		fileinfo := strings.Split(responseArgs[1], "\t")
-		fileSize, err := strconv.ParseUint(fileinfo[1], 10, 64)
-		if err != nil {
-			log.Println("Error: error in parsing file size from string to uint64")
-			fmt.Println("Error: error in parsing file size from string to uint64")
-			return nil, nil
-		}
-		// ignore chunk_size
 		file := &utility.File{
-			Filename:      fileinfo[0],
-			Checksum:      responseArgs[2],
-			FileSize:      fileSize,
+			Filename:      fileName,
 			ChunkNodeList: responseArgs[3:],
 		}
 		return file, nil

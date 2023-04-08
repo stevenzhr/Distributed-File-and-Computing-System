@@ -127,7 +127,7 @@ func sendMRRequest(mrMsgHandler *utility.MessageHandler, soChunk *utility.Chunk,
 		log.Printf("WARNING: Connection error when send request to controller. (%s)\n", err.Error())
 		return err
 	}
-	log.Println("LOG: Successfully sent MapReduce request. ")
+	log.Printf("LOG: Successfully sent MapReduce task %s on %s.\n", soChunk.FileName, inputFile.Filename)
 	return nil
 }
 
