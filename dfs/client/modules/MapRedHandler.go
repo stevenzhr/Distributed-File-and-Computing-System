@@ -50,7 +50,7 @@ func MapReduce(reqStr []string, managerHost string) bool {
 	_, err = reader.Read(soFileData)
 	if err != nil && err.Error() != "EOF" {
 		log.Println("WARNING: File read error when read in .so file. ", err.Error())
-		fmt.Println("WARNING: File read error when read in .so file. ")
+		fmt.Println("File read error when read in .so file. ")
 		return true
 	}
 
@@ -93,7 +93,7 @@ func getMRResponse(mrMsgHandler *utility.MessageHandler) error {
 	switch resType {
 	case "accept":
 		log.Println("LOG: MapReduce request accepted.")
-		fmt.Println("LOG: MapReduce request accepted.")
+		fmt.Println("MapReduce request accepted.")
 	case "deny":
 		log.Println("WARNING: MapReduce request denied by manager.")
 		fmt.Println("MapReduce request denied by manager.")
