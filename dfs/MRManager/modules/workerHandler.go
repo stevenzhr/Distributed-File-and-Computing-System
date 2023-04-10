@@ -90,5 +90,10 @@ func handleJoin(hostPort string, msgHandler *utility.MessageHandler) {
 func addNewWorker(hostName string, hostnPort string) {
 	workersMutex.Lock()
 	Workers[hostName] = hostnPort
+	//TODO: delete debug info
+	fmt.Println("Current Workers Map:")
+	for key, value := range Workers {
+		fmt.Println(key, value)
+	}
 	workersMutex.Unlock()
 }
