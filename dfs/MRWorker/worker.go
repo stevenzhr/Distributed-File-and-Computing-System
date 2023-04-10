@@ -20,6 +20,7 @@ func main() {
 		return
 	}
 	defer logFile.Close()
+	log.SetOutput(logFile)
 
 	// create listener socket
 	mrListener, err := CreateListener()

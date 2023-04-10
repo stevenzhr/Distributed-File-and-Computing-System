@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 )
 
 // worker to manager connection initialization
@@ -30,6 +31,7 @@ func JoinServer() error {
 	// worker send host:port in join request to manager
 	log.Println("LOG: Send join request to manager. ")
 	localhost, _ := os.Hostname()
+	localhost = strings.Split(localhost, ".")[0]
 	hostPort := localhost + ":" + os.Args[2]
 
 	reqMsg := utility.Request{

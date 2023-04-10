@@ -22,6 +22,12 @@ var (
 	ReduceTasks  map[string]TaskStatus //same as above
 )
 
+func init() {
+	Workers = make(map[string]string)
+	MapTasks = make(map[string]TaskStatus)
+	ReduceTasks = make(map[string]TaskStatus)
+}
+
 func ListenWorkerConn(wg *sync.WaitGroup) {
 	flag := true
 	listener, err := net.Listen("tcp", ":"+os.Args[1])
