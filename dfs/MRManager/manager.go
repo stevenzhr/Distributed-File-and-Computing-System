@@ -30,9 +30,9 @@ func main() {
 
 	wg.Add(1)
 	// start listen worker req
-	ListenWorkerConn(&wg)
+	go ListenWorkerConn(&wg)
 	// start listen client req
-	ListenClientConn(&wg)
+	go ListenClientConn(&wg)
 	wg.Wait()
 	// shutdown process
 }

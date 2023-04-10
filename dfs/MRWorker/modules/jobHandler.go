@@ -40,9 +40,9 @@ func StartListening(listener net.Listener) {
 func handleMapRedRequest(msgHandler *utility.MessageHandler) {
 	// process request
 	defer msgHandler.Close()
-	wrapper, err := msgHandler.Receive()
-	if err != nil {
-		log.Println(err.Error())
-		return
-	}
+	// wrapper, err := msgHandler.Receive()
+	// if err != nil {
+	// 	log.Println(err.Error())
+	// 	return
+	// }
 }

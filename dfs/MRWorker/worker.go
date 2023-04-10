@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-//go run node.go orion02:28997 28620(listen port)
+//go run node.go orion02:xx997 xx620(listen port)
 // manager listens at 997, worker listens at 620
 func main() {
 	// init log output
@@ -28,6 +28,11 @@ func main() {
 		return
 	}
 	Flag = true
+	err = JoinServer()
+	if err != nil {
+		workerShutDown()
+		return
+	}
 	StartListening(mrListener)
 
 }
