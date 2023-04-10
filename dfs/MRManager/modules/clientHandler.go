@@ -100,7 +100,8 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 	//TODO: 不用打印，直接用就好
 	fmt.Println(mapAssignment)
 	// TODO: add process map & reduce
-
+	// new a connection with workers
+	// send request to workers
 	return &utility.Wrapper{
 		Msg: &utility.Wrapper_ResponseMsg{
 			ResponseMsg: &utility.Response{

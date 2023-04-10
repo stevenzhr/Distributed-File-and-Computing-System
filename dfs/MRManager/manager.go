@@ -13,7 +13,7 @@ var (
 )
 
 // go run manager.go 28997 28996
-
+// 997 listen to worker， 996 listen to client
 func main() {
 	// init log output
 	host, _ := os.Hostname()
