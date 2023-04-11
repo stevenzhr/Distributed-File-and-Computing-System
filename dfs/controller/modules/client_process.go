@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -88,10 +89,17 @@ func handlePutFileReq(fileInfo *utility.File) *utility.Wrapper {
 	} else {
 		// file check all good, calculate number of splits
 		chunkSize := fileInfo.GetChunkSize()
-		numOfChunk := int(math.Ceil(float64(fileSize) / float64(chunkSize)))
+		var numOfChunk int
+		if ext := filepath.Ext(filename); ext == ".csv" || ext == ".txt" {
+			// special case for csv and txt: num come from client
+			numOfChunk = len(fileInfo.GetChunkNodeList())
+		} else {
+			// general case: calculate numOfChunk
+			numOfChunk = int(math.Ceil(float64(fileSize) / float64(chunkSize)))
+		}
 		// create chunk-node list
 		log.Printf("LOG: Upload file check done. Prepare node list response. #chunk: %d, chunksize: %d \n", numOfChunk, chunkSize)
-		// FIXME: decide generate nodeList strategy
+		// decide generate nodeList strategy
 		nodeList := getNodeListBySep(filename, numOfChunk, chunkSize)
 		// log.Println("LOG: Assigned node list: ", nodeList)
 		// add file info to FileMap
