@@ -124,3 +124,57 @@ func ListNode(reqStr []string) bool {
 	}
 	return true
 }
+
+func isFileExist(fileName string) (*utility.File, error) {
+	args := [3]string{"ls", fileName, "-c"}
+	// send a "ls filename -c" request
+	reqMsg := utility.Request{
+		Req: &utility.Request_StatusReq{
+			StatusReq: &utility.StatusReq{
+				Type:       "ls",
+				RequestArg: args[:],
+			},
+		},
+	}
+	wrapper := &utility.Wrapper{
+		Msg: &utility.Wrapper_RequestMsg{
+			RequestMsg: &reqMsg,
+		},
+	}
+	err := msgHandler.Send(wrapper)
+	if err != nil {
+		fmt.Println("Connection error when send request to controller. Please exit.")
+		log.Printf("WARNING: Connection error when send request to controller. (%s)\n", err.Error())
+		return nil, err
+	}
+	log.Println("LOG: Successfully sent list file request. ")
+	//  file-list response
+	resWrapper, err := msgHandler.Receive()
+	if err != nil {
+		fmt.Println("Connection error when unpackage from controller. Please exit. ")
+		log.Printf("WARNING: Connection error when unpackage from controller. (%s)\n", err.Error())
+		return nil, err
+	}
+	resType := resWrapper.GetResponseMsg().GetGeneralRes().GetResType()
+	switch resType {
+	case "accept":
+		responseArgs := resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()
+		log.Println("LOG: accept response. Args type: ", responseArgs[0])
+		file := &utility.File{
+			Filename:      fileName,
+			ChunkNodeList: responseArgs[3:],
+		}
+		return file, nil
+	case "deny":
+		responseArgs := resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()
+		log.Println("LOG: deny response. Args: ", responseArgs)
+		for i := 0; i < len(responseArgs); i++ {
+			fmt.Println(responseArgs[i])
+		}
+		return nil, nil
+	default:
+		log.Println("WARNING: Unknown error when package from controller.(Can't parse response type) ")
+		fmt.Println("Unknown error when package from controller.(Can't parse response type) ")
+	}
+	return nil, nil
+}

@@ -12,7 +12,7 @@ import (
 func SetLogFile(host, port string) (*os.File, error) {
 	wd, _ := os.Getwd()
 	logFilename := wd + "/log/" + host + "_" + port + "_" + time.Now().Format("20060102-150405") + ".log"
-	err := os.MkdirAll("log/", os.ModePerm)
+	err := os.MkdirAll("log/MR", os.ModePerm)
 	if err != nil {
 		fmt.Println("Can't create or open temp folder. ", err)
 		return nil, err

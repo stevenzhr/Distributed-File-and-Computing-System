@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-port_prefix=28 # Put your assigned port prefix here.
+port_prefix=26 # Put your assigned port prefix here.
                # See: https://www.cs.usfca.edu/~mmalensek/cs677/schedule/materials/ports.html
 nodes=12      # Number of nodes to run
 
