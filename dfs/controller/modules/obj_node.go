@@ -24,10 +24,9 @@ type Node struct {
 	AvailableSpace    uint64   `json:"AvailableSpace"`
 	RequestCount      uint64   `json:"RequestCount"`
 	ChunkList         []string `json:"ChunkList"`
-	ResQueue          []string `json:"ResQueue"` //FIXME:["deleteCnk,chunk1.cnk,chunk2.cnk,chunk3.cnk", "copyCnk,chunk_a.cnk"]
+	ResQueue          []string `json:"ResQueue"` //["deleteCnk,chunk1.cnk,chunk2.cnk,chunk3.cnk", "copyCnk,chunk_a.cnk"]
 	appendantChunkMap map[string]uint64
 	lastHeartBeatTime string
-	// ChunkRequestList  map[string]string  // FIXME:
 }
 
 var (

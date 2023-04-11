@@ -72,16 +72,26 @@ func StoreFile(reqStr []string) bool {
 	}
 	log.Printf("LOG: Prepare save file: %s(%d MB)[%s]\n", filename, fileSize/1024/1024, checksum)
 	fmt.Printf("Prepare save file: %s(%d MB)[%s]\n", filename, fileSize/1024/1024, checksum)
+	// TODO: process special cases for .csv and .txt to get numOfChunk
+	var chunkNodeList []string
+	if ext := filepath.Ext(filename); ext == ".csv" || ext == ".txt" {
+		numOfChunk := getFileByLine(filename, fileSize, chunkSize)
+		chunkNodeList = make([]string, numOfChunk)
+		if chunkSize == 0 {
+			return true
+		}
+	}
 	// Send store file request
 	reqMsg := utility.Request{
 		Req: &utility.Request_FileReq{
 			FileReq: &utility.FileReq{
 				ReqType: "put",
 				FileInfo: &utility.File{
-					Filename:  filename,
-					Checksum:  checksum,
-					FileSize:  fileSize,
-					ChunkSize: uint64(chunkSize),
+					Filename:      filename,
+					Checksum:      checksum,
+					FileSize:      fileSize,
+					ChunkSize:     uint64(chunkSize),
+					ChunkNodeList: chunkNodeList,
 				},
 			},
 		},
@@ -123,6 +133,61 @@ func StoreFile(reqStr []string) bool {
 	return true
 }
 
+// special process for csv & txt, read file line by line and calculate num of chunk
+func getFileByLine(fileName string, fileSize uint64, chunkSize int) int {
+	// TODO: fill the code
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Printf("ERROR: Can not open file(%s). %s", fileName, err)
+		fmt.Printf("ERROR: Can not open file(%s). %s", fileName, err)
+		return 0
+	}
+	defer file.Close()
+	reader := bufio.NewReader(file)
+	var i int
+	for i = 0; i < int(fileSize)/chunkSize+1; i++ {
+		chunkData := make([]byte, chunkSize)
+		pointer := 0
+		for {
+			str := make([]byte, 1)
+			n, _ := reader.Read(str)
+			if n == 0 {
+				chunkData = chunkData[:pointer]
+				break
+			} else if pointer >= chunkSize {
+				chunkData = append(chunkData, str...)
+				if str[0] == byte(10) {
+					break
+				}
+			} else {
+				chunkData[pointer] = str[0]
+			}
+			pointer++
+		}
+		if pointer == 0 {
+			break
+		}
+		chunkNameStr := fmt.Sprintf("temp/%s_%d-.cnk", fileName, i+1)
+		err := ioutil.WriteFile(chunkNameStr, chunkData, 0666)
+		if err != nil {
+			log.Printf("ERROR: Can not create chunk file(%s). %s", fileName, err)
+			fmt.Printf("ERROR: Can not create chunk file(%s). %s", fileName, err)
+			return 0
+		}
+	}
+	for j := 0; j < i; j++ {
+		preChunkNameStr := fmt.Sprintf("temp/%s_%d-.cnk", fileName, j+1)
+		ChunkNameStr := fmt.Sprintf("temp/%s_%d-%d.cnk", fileName, j+1, i)
+		err := os.Rename(preChunkNameStr, ChunkNameStr)
+		if err != nil {
+			log.Printf("ERROR: Can not rename file(%s). %s", fileName, err)
+			fmt.Printf("ERROR: Can not rename file(%s). %s", fileName, err)
+			return 0
+		}
+	}
+	return i
+}
+
 // splite file to chunks and send them by response node list
 func sendFile(path string, fileSize uint64, chunkSize int, responseArgs []string) {
 	file, err := os.Open(path)
@@ -143,19 +208,10 @@ func sendFile(path string, fileSize uint64, chunkSize int, responseArgs []string
 		formattedChunkSize = fmt.Sprintf("%d byte", chunkSize)
 	}
 
-	// numStr := strconv.FormatInt(int64(chunkSize), 10)
-	// formattedChunkSize := ""
-
-	// for i, digit := range numStr {
-	// 	if i > 0 && (len(numStr)-i)%3 == 0 {
-	// 		formattedChunkSize += ","
-	// 	}
-	// 	formattedChunkSize += string(digit)
-	// }
-
 	ch := make(chan bool, numOfChunk)
 	// split to chunk and send
 	fmt.Printf("Start sending %d chunks, each of size %s byte.\n", numOfChunk, formattedChunkSize)
+	// TODO: re-write split chunk method
 	for i := 0; i < numOfChunk; i++ {
 		log.Printf("LOG: Start send chunks: %d/%d to Node: %s \n", i+1, numOfChunk, strings.Split(responseArgs[i], ",")[0])
 		// fmt.Printf("Start send chunks: %d/%d to Node: %s \n", i+1, numOfChunk, strings.Split(responseArgs[i], ",")[0])
@@ -459,7 +515,7 @@ func getChunks(fileName string, fileChecksum string, fileSize int64, chunkSize i
 			fmt.Printf("Can't read chunk %s.\n", chunkNameStr)
 			return
 		}
-		file.Write(data)
+		_, err = file.Write(data)
 		if err != nil {
 			log.Printf("ERROR: Can't write chunk %s into file %s.\n", chunkNameStr, fileName)
 			fmt.Printf("Can't write chunk %s into file %s.\n", chunkNameStr, fileName)
