@@ -83,10 +83,11 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 		}
 		return nil
 	}
+	// check the checksum of .so file
 	_, checksum, _ := utility.FileInfo(filePath)
 	if checksum != mapredReq.GetSoChunk().GetChecksum() {
 		os.Remove(filePath)
-		log.Println("WARNING: Checksum unmatched, delete local chunk file. ")
+		log.Println("WARNING: Checksum unmatched, delete local .so file. ")
 		log.Printf("LOG: Checksum: local(%s) vs req(%s) \n", checksum, mapredReq.GetSoChunk().GetChecksum())
 		generalRes = utility.GeneralRes{
 			ResType: "deny",
@@ -97,9 +98,11 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 
 	mapAssignment := assignNodeWithChunks(mapredReq)
 
-	//TODO: 不用打印，直接用就好
-	fmt.Println(mapAssignment)
+	// init map tasks
+	initMapTasks(mapAssignment)
+
 	// TODO: add process map & reduce
+
 	// new a connection with workers
 	// send request to workers
 	return &utility.Wrapper{
@@ -204,4 +207,8 @@ func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 	}
 
 	return &mapAssignment
+}
+
+func initMapTasks(mapAssignment map[string][]string) {
+	//TODO: update
 }

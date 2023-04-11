@@ -106,6 +106,7 @@ func getMRResponse(mrMsgHandler *utility.MessageHandler) error {
 
 func sendMRRequest(mrMsgHandler *utility.MessageHandler, soChunk *utility.Chunk,
 	inputFile *utility.File, outputName string, parameters []string) error {
+	// prepare message sent to MRManager
 	reqMsg := utility.Request{
 		Req: &utility.Request_MapredReq{
 			MapredReq: &utility.MapRedReq{
@@ -131,12 +132,12 @@ func sendMRRequest(mrMsgHandler *utility.MessageHandler, soChunk *utility.Chunk,
 	return nil
 }
 
-// Establish connection with controller
+// Establish connection with MRManager
 func createConnection(host string) (*utility.MessageHandler, error) {
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
-		fmt.Println("ERROR: Can't establish connection with server. Please check server name. ")
-		log.Println("ERROR: Can't establish connection with server. Please check server name. ")
+		fmt.Println("ERROR: Can't establish connection with MRManager. Please check server name. ")
+		log.Println("ERROR: Can't establish connection with MRManager. Please check server name. ")
 		return nil, err
 	}
 	msgHandler := utility.NewMessageHandler(conn)
