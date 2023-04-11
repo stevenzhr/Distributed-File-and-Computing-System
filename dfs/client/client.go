@@ -16,7 +16,7 @@ import (
 // 	wg         sync.WaitGroup
 // )
 
-//go run client.go orion01:28998
+//go run client.go orion01:28998 mrManagerName:port
 //1 - controller listen port
 func main() {
 	// init log output
@@ -53,7 +53,7 @@ func main() {
 		case "exit":
 			fmt.Println("Thank you for using Wonderpea Distributed File System. Bye~")
 			return
-		case "store": // store filename filesize(MB)
+		case "put": // store filename filesize(MB)
 			if len(reqStrs) < 2 {
 				fmt.Println("Please input upload filename. [store example.txt 5]")
 			} else {
@@ -65,7 +65,7 @@ func main() {
 			} else {
 				alive = GetFile(reqStrs)
 			}
-		case "delete": // delete filename
+		case "rm": // delete filename
 			if len(reqStrs) != 2 {
 				fmt.Println("Please input upload filename. [delete example.txt]")
 			} else {
@@ -82,6 +82,12 @@ func main() {
 				fmt.Println("Please input correct lsn command. [lsn nodeName(optional)]")
 			} else {
 				alive = ListNode(reqStrs)
+			}
+		case "mp":
+			if len(reqStrs) < 4 {
+				fmt.Println("Please input corrent mp command. [mp so_file_path input_name output_name parameter(optional)]")
+			} else {
+				alive = MapReduce(reqStrs, os.Args[2])
 			}
 		case "help":
 			fmt.Println("Currently, I don't have help instruction, try dig what you want in README. :)")

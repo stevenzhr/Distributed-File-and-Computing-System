@@ -8,6 +8,7 @@ message Request {
         ChunkReq chunk_req = 2;
         StatusReq status_req = 3;
         JoinReq join_req = 4;
+        MapRedReq mapred_req = 5;
     }
 }
 
@@ -23,6 +24,13 @@ message File {
     uint64 file_size = 3;
     uint64 chunk_size = 4;
     repeated string chunk_node_list = 5;
+}
+
+message MapRedReq {
+    Chunk so_chunk = 1;     // .so file
+    File input_file = 2;
+    string output_name = 3;
+    repeated string parameters = 4;
 }
 
 /* Chunk request*/
@@ -41,7 +49,7 @@ message Chunk {
 
 /* Status request*/
 message StatusReq {
-    string type = 1;
+    string type = 1;        // ls, lsn
     repeated string request_arg = 2;
 }
 
@@ -61,7 +69,7 @@ message Response {
 
 message GeneralRes {
     string res_type = 1;                // accept, deny, queue
-    repeated string response_arg = 2;   // queue mode for first str: init, copyCnk, deleteCnk, shutdown
+    repeated string response_arg = 2;   // list, file
 }
 
 message ChunkRes {

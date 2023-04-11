@@ -146,7 +146,7 @@ func reassignAChunk(chunkNameChkSm string, nodeList []string) {
 	nodeMutex.RLock()
 	candidateNodeNameList := make([]string, len(NodeMap))
 	// get all available node list
-	for nodeName, _ := range NodeMap {
+	for nodeName := range NodeMap {
 		candidateNodeNameList[i] = nodeName
 		i++
 	}
