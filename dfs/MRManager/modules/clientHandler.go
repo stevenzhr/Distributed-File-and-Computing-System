@@ -209,6 +209,6 @@ func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 	return &mapAssignment
 }
 
-func initMapTasks(mapAssignment map[string][]string) {
+func initMapTasks(mapAssignment *map[string][]string) {
 	//TODO: update
 }
