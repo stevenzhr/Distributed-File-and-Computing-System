@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-port_prefix=26 # Put your assigned port prefix here.
+port_prefix=28 # Put your assigned port prefix here.
                # See: https://www.cs.usfca.edu/~mmalensek/cs677/schedule/materials/ports.html
 nodes=12      # Number of nodes to run
 
@@ -27,7 +27,7 @@ for (( i = 0; i < nodes; i++ )); do
     # This will ssh to the machine, and run 'node orion01 <some port>' in the
     # background.
     echo "Starting worker on ${servers[${server}]} on port ${port}"
-    ssh ${servers[${server}]} "${HOME}/big_data/P2-map_increase/dfs/MRWorker/worker orion02:26997 ${port}" &
+    ssh ${servers[${server}]} "${HOME}/CS677-BigData/P2-map_increase/dfs/MRWorker/worker orion02:26997 ${port}" &
 done
 
 echo "Startup complete"

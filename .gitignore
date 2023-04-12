@@ -2,5 +2,6 @@
 *.json
 *.cnk
 *.sh
-config.go
-dfs/MRWorker/.nfs00000000f1b08b430000009f
+dfs/test/start.sh
+.gitignore
+dfs/config/config.go

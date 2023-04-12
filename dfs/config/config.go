@@ -9,7 +9,7 @@ import (
 
 const (
 	TIME_FORMAT          = "2006-01-02 15:04:05"
-	VAULT_PATH           = "/bigdata/students/xwang247/vault/"
+	VAULT_PATH           = "/bigdata/students/hzhang129/vault/"
 	REPORT_GAP_THRESHOLD = 21
 	HEART_BEAT_RATE      = 3
 	CHUNK_SIZE           = 64 * 1024 * 1024  // 64 MB

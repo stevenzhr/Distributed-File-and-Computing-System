@@ -27,7 +27,7 @@ for (( i = 0; i < nodes; i++ )); do
     # This will ssh to the machine, and run 'node orion01 <some port>' in the
     # background.
     echo "Starting node on ${servers[${server}]} on port ${port}"
-    ssh ${servers[${server}]} "${HOME}/big_data/P2-map_increase/dfs/node/node orion02:26999 ${port}" &
+    ssh ${servers[${server}]} "${HOME}/CS677-BigData/P2-map_increase/dfs/node/node orion02:26999 ${port}" &
 done
 
 echo "Startup complete"
