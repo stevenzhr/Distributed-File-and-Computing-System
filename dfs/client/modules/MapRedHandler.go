@@ -78,7 +78,7 @@ func MapReduce(reqStr []string, managerHost string) bool {
 	if err != nil {
 		return false
 	}
-
+	// TODO: 不应该直接结束，要等结果完成了再结束
 	return true
 }
 

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -99,7 +100,9 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 	mapAssignment := assignNodeWithChunks(mapredReq)
 
 	// init map tasks
-	initMapTasks(mapAssignment)
+	initTasks(mapredReq)
+	updateMapTasks(mapAssignment)
+	updateReduceTasks(mapAssignment)
 
 	// TODO: add process map & reduce
 
@@ -120,7 +123,7 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 // transfer it into (node : chunks store on it)
 // always assign the node with the least number of choices(chunks)
 // do not assign the node if it already has more works than average
-// return a map of each node and their map chunks
+// return a map of each node and their map chunks， key: orion03:26000,  value: [chunk1, chunk3, ...]
 func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 	// test_4.bin_2-15.cnk:	orion02:26521,orion07:26526,orion06:26525
 	chunkNodeList := mapredReq.GetInputFile().GetChunkNodeList()
@@ -146,6 +149,16 @@ func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 			nodeChunkMap[value[i]] = append(nodeChunkMap[value[i]], key)
 		}
 	}
+
+	// translate storage node port to worker node port in key
+	tempMap := make(map[string][]string)
+	for key, value := range nodeChunkMap {
+		hostName := strings.Split(key, ":")[0]
+		workerName := Workers[hostName]
+		tempMap[workerName] = value
+	}
+	nodeChunkMap = tempMap
+
 	nodeNum := len(nodeChunkMap)
 
 	// always assign the node with least options
@@ -209,6 +222,69 @@ func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 	return &mapAssignment
 }
 
-func initMapTasks(mapAssignment *map[string][]string) {
-	//TODO: update
+// insert all keys of MapTasks and ReduceTaks
+func initTasks(mapredReq *utility.MapRedReq) {
+	// clear map
+	MapTasks = make(map[string]TaskStatus)
+	ReduceTasks = make(map[string]TaskStatus)
+	// test_4.bin_2-15.cnk: orion02:26521,orion07:26526,orion06:26525
+	chunkNodeList := mapredReq.GetInputFile().GetChunkNodeList()
+	// insert all the key of mapper
+	for _, chunkNode := range chunkNodeList {
+		temp := strings.Split(chunkNode, ":\t")
+		chunkName := temp[0]
+		MapTasks[chunkName] = TaskStatus{}
+	}
+	// insert all the key of reducer
+	// TODO: get the reducer number
+	r := 3
+	for i := 1; i <= r; i++ {
+		reducerName := "p" + strconv.Itoa(i)
+		ReduceTasks[reducerName] = TaskStatus{}
+	}
+
+}
+
+// update which worker will process each chunk， set the map status to idle
+func updateMapTasks(mapAssignment *map[string][]string) {
+	log.Println("Start populating MapTasks.")
+	for workerName, chunkList := range *mapAssignment {
+		for _, chunkName := range chunkList {
+			status := MapTasks[chunkName]
+			status.Worker = workerName
+			status.Status = "idle"
+			MapTasks[chunkName] = status
+			log.Printf("%s  :  {%s,  %s}\n", chunkName, status.Worker, status.Status)
+		}
+	}
+	log.Println("Finish populating MapTasks.")
+}
+
+// assign reduce jobs to the mappers that did most amount of map tasks, so maximize locality
+func updateReduceTasks(mapAssignment *map[string][]string) {
+	log.Println("Start populating ReduceTasks.")
+	// map: key-worker, value- # of map tasks
+	mapCount := make(map[string]int)
+	for worker, taskList := range *mapAssignment {
+		mapCount[worker] = len(taskList)
+	}
+
+	// always assign the reduce tasks to the worker with the most map tasks
+	for reduceTask := range ReduceTasks {
+		maxMapNum := 0
+		maxWorker := ""
+		for worker, assignedNum := range mapCount {
+			if assignedNum > maxMapNum {
+				maxMapNum = assignedNum
+				maxWorker = worker
+			}
+		}
+		status := ReduceTasks[reduceTask]
+		status.Status = "idle"
+		status.Worker = maxWorker
+		ReduceTasks[reduceTask] = status
+		delete(mapCount, maxWorker)
+		log.Printf("%s  :  {%s,  %s}\n", reduceTask, status.Worker, status.Status)
+	}
+	log.Println("Finish populating ReduceTasks.")
 }

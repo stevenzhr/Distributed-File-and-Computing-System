@@ -11,15 +11,15 @@ import (
 )
 
 type TaskStatus struct {
-	Status string // idle, in-progress, completed
-	Worker string
+	Status string // idle, completed
+	Worker string // host:worker_port
 }
 
 var (
 	workersMutex sync.RWMutex
 	Workers      map[string]string     // key: orion01, value: (orion01:workerport)
 	MapTasks     map[string]TaskStatus //key: chunk name,   value: TaskStatus
-	ReduceTasks  map[string]TaskStatus //same as above
+	ReduceTasks  map[string]TaskStatus //key: p1,  value: TaskStatus
 )
 
 func init() {
@@ -90,10 +90,5 @@ func handleJoin(hostPort string, msgHandler *utility.MessageHandler) {
 func addNewWorker(hostName string, hostnPort string) {
 	workersMutex.Lock()
 	Workers[hostName] = hostnPort
-	//TODO: delete debug info
-	fmt.Println("Current Workers Map:")
-	for key, value := range Workers {
-		fmt.Println(key, value)
-	}
 	workersMutex.Unlock()
 }
