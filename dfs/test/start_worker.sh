@@ -21,7 +21,7 @@ servers=(
 )
 
 for (( i = 0; i < nodes; i++ )); do
-    port=$(( port_prefix * 1000 + i + 690 ))
+    port=$(( port_prefix * 1000 + i + 350 ))
     server=$(( i % ${#servers[@]} ))
 
     # This will ssh to the machine, and run 'node orion01 <some port>' in the
