@@ -60,6 +60,7 @@ func MapReduce(reqStr []string, managerHost string) bool {
 		Size:       soFileSize,
 		DataStream: soFileData,
 	}
+	log.Printf("LOG: Send so file(%s), checksum(%s), size(%d). \n", filepath.Base(soFilePath), soFileChksm, soFileSize)
 	// connect to MapReduce manager
 	mrMsgHandler, err := createConnection(managerHost)
 	if err != nil {
@@ -107,6 +108,7 @@ func getMRResponse(mrMsgHandler *utility.MessageHandler) error {
 func sendMRRequest(mrMsgHandler *utility.MessageHandler, soChunk *utility.Chunk,
 	inputFile *utility.File, outputName string, parameters []string) error {
 	// prepare message sent to MRManager
+	log.Println(inputFile.ChunkNodeList) //-------------
 	reqMsg := utility.Request{
 		Req: &utility.Request_MapredReq{
 			MapredReq: &utility.MapRedReq{

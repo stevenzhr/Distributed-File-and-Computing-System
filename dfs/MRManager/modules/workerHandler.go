@@ -10,16 +10,9 @@ import (
 	"sync"
 )
 
-type TaskStatus struct {
-	Status string // idle, completed
-	Worker string // host:worker_port
-}
-
 var (
 	workersMutex sync.RWMutex
-	Workers      map[string]string     // key: orion01, value: (orion01:workerport)
-	MapTasks     map[string]TaskStatus //key: chunk name,   value: TaskStatus
-	ReduceTasks  map[string]TaskStatus //key: p1,  value: TaskStatus
+	Workers      map[string]string // key: orion01, value: (orion01:workerport)
 )
 
 func init() {

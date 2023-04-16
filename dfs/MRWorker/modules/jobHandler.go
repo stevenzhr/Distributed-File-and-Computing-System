@@ -31,7 +31,7 @@ func StartListening(listener net.Listener) {
 	for Flag {
 		if conn, err := listener.Accept(); err == nil {
 			msgHandler := utility.NewMessageHandler(conn)
-			handleMapRedRequest(msgHandler)
+			go handleMapRedRequest(msgHandler)
 		}
 	}
 
@@ -40,9 +40,19 @@ func StartListening(listener net.Listener) {
 func handleMapRedRequest(msgHandler *utility.MessageHandler) {
 	// process request
 	defer msgHandler.Close()
-	// wrapper, err := msgHandler.Receive()
-	// if err != nil {
-	// 	log.Println(err.Error())
-	// 	return
-	// }
+	wrapper, err := msgHandler.Receive()
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+	if msg, ok := wrapper.Msg.(*utility.Wrapper_RequestMsg); ok {
+		switch req := msg.RequestMsg.Req.(type) {
+		case *utility.Request_MapTaskReq:
+			handleMapTasks(req, msgHandler)
+		case *utility.Request_RedTaskReq:
+			handleReduceTask(req, msgHandler)
+		default:
+			log.Println("LOG: Receive unknown type of MapRedReq. ", req)
+		}
+	}
 }
