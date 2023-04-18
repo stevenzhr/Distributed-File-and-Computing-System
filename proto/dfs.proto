@@ -22,7 +22,7 @@ message FileReq {
 }
 
 message GeneralReq {
-    string req_type = 1;
+    string req_type = 1;                // map_task_report, red_task_report
     repeated string args = 2;
 }
 
@@ -42,8 +42,10 @@ message MapTaskReq {
 
 message RedTaskReq {
     Chunk so_chunk = 1;
-    string partition_filename = 2;
-    repeated string parameters = 3;
+    string map_task_id = 2;
+    string red_task_id = 3;
+    string mapper_host = 4;
+    uint32 num_of_chunks = 5;
 }
 
 message MapRedReq {

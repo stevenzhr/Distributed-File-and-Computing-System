@@ -1,8 +1,10 @@
 package workerModules
 
 import (
+	"dfs/config"
 	"dfs/utility"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -50,9 +52,59 @@ func handleMapRedRequest(msgHandler *utility.MessageHandler) {
 		case *utility.Request_MapTaskReq:
 			handleMapTasks(req, msgHandler)
 		case *utility.Request_RedTaskReq:
-			handleReduceTask(req, msgHandler)
+			handleReduceTasks(req, msgHandler)
+		case *utility.Request_ChunkReq:
+			handleGetPartition(req, msgHandler)
 		default:
 			log.Println("LOG: Receive unknown type of MapRedReq. ", req)
 		}
 	}
+}
+
+func handleGetPartition(req *utility.Request_ChunkReq, msgHandler *utility.MessageHandler) {
+	resMsg := utility.Response{
+		Res: &utility.Response_ChunkRes{
+			ChunkRes: &utility.ChunkRes{
+				Status: false,
+			},
+		},
+	}
+	chunk := req.ChunkReq.GetChunkData()
+	partitionFileName := chunk.GetFileName()
+	log.Printf("LOG: Receive get partition file(%s) request. \n", partitionFileName)
+	filepath := fmt.Sprintf("%sws/%s", config.VAULT_PATH, partitionFileName)
+	dataStream, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		wrapper := &utility.Wrapper{
+			Msg: &utility.Wrapper_ResponseMsg{
+				ResponseMsg: &resMsg,
+			},
+		}
+		err := msgHandler.Send(wrapper)
+		if err != nil {
+			log.Println("ERROR: Fail to send response. ")
+			return
+		}
+		return
+	}
+	chunk.DataStream = dataStream
+	resMsg = utility.Response{
+		Res: &utility.Response_ChunkRes{
+			ChunkRes: &utility.ChunkRes{
+				Status:    true,
+				ChunkData: chunk,
+			},
+		},
+	}
+	wrapper := &utility.Wrapper{
+		Msg: &utility.Wrapper_ResponseMsg{
+			ResponseMsg: &resMsg,
+		},
+	}
+	err = msgHandler.Send(wrapper)
+	if err != nil {
+		log.Println("ERROR: Fail to send response. ")
+		return
+	}
+	log.Printf("LOG: Send partition file(%s) response. \n", partitionFileName)
 }

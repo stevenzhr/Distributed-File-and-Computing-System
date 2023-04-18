@@ -47,9 +47,9 @@ func handleWorkerRequest(msgHandler *utility.MessageHandler) {
 	if msg, ok := wrapper.Msg.(*utility.Wrapper_RequestMsg); ok {
 		if req, ok := msg.RequestMsg.Req.(*utility.Request_JoinReq); ok {
 			handleJoin(req.JoinReq.NodeHostPort, msgHandler)
+		} else if req, ok := msg.RequestMsg.Req.(*utility.Request_GeneralReq); ok {
+			go handleTaskReport(req)
 		}
-	} else if _, ok := wrapper.Msg.(*utility.Wrapper_HeartbeatMsg); ok {
-		//TODO: handle task report
 	} else {
 		fmt.Println("Invalid request. ")
 	}

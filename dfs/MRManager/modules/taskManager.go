@@ -8,6 +8,7 @@ import (
 	"plugin"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type Task interface {
@@ -18,14 +19,41 @@ type Task interface {
 }
 
 type TaskStatus struct {
-	Status string // idle, completed
+	Status string // idle, completed, fail
 	Worker string // host:worker_port
 }
 
 var (
+	mapMutex    sync.RWMutex
 	MapTasks    map[string]TaskStatus //key: chunk name,   value: TaskStatus
 	ReduceTasks map[string]TaskStatus //key: p1,  value: TaskStatus
 )
+
+func getMapTasks(key string) TaskStatus {
+	mapMutex.RLock()
+	status := MapTasks[key]
+	mapMutex.RUnlock()
+	return status
+}
+
+func setMapTasks(key string, value TaskStatus) {
+	mapMutex.Lock()
+	MapTasks[key] = value
+	mapMutex.Unlock()
+}
+
+func getReduceTasks(key string) TaskStatus {
+	mapMutex.RLock()
+	status := ReduceTasks[key]
+	mapMutex.RUnlock()
+	return status
+}
+
+func setReduceTasks(key string, value TaskStatus) {
+	mapMutex.Lock()
+	ReduceTasks[key] = value
+	mapMutex.Unlock()
+}
 
 // get a map of (chunk : 3 nodes)
 // transfer it into (node : chunks store on it)
@@ -183,22 +211,22 @@ func getNumOfRedTask(soFilePath string) (int, error) {
 
 // update which worker will process each chunk， set the map status to idle
 func updateMapTasks(mapAssignment *map[string][]string) {
-	log.Println("Start populating MapTasks.")
+	log.Println("LOG: Start populating MapTasks.")
 	for workerName, chunkList := range *mapAssignment {
 		for _, chunkName := range chunkList {
 			status := MapTasks[chunkName]
 			status.Worker = workerName
 			status.Status = "idle"
 			MapTasks[chunkName] = status
-			log.Printf("%s  :  {%s,  %s}\n", chunkName, status.Worker, status.Status)
+			log.Printf("LOG: %s  :  {%s,  %s}\n", chunkName, status.Worker, status.Status)
 		}
 	}
-	log.Println("Finish populating MapTasks.")
+	log.Println("LOG: Finish populating MapTasks.")
 }
 
 // assign reduce jobs to the mappers that did most amount of map tasks, so maximize locality
 func updateReduceTasks(mapAssignment *map[string][]string) {
-	log.Println("Start populating ReduceTasks.")
+	log.Println("LOG: Start populating ReduceTasks.")
 	// map: key-worker, value- # of map tasks
 	mapCount := make(map[string]int)
 	for worker, taskList := range *mapAssignment {
@@ -220,9 +248,9 @@ func updateReduceTasks(mapAssignment *map[string][]string) {
 		status.Worker = maxWorker
 		ReduceTasks[reduceTask] = status
 		delete(mapCount, maxWorker)
-		log.Printf("%s  :  {%s,  %s}\n", reduceTask, status.Worker, status.Status)
+		log.Printf("LOG: %s  :  {%s,  %s}\n", reduceTask, status.Worker, status.Status)
 	}
-	log.Println("Finish populating ReduceTasks.")
+	log.Println("LOG: Finish populating ReduceTasks.")
 }
 
 func assignMapTasks(mapAssignment *map[string][]string, soChunk *utility.Chunk, parameters []string) {
@@ -265,4 +293,78 @@ func createConnection(host string) (net.Conn, error) {
 		return nil, err
 	}
 	return conn, nil
+}
+
+func handleTaskReport(req *utility.Request_GeneralReq) {
+	switch req.GeneralReq.ReqType {
+	case "map_task_report":
+		handleMapTaskReport(req.GeneralReq.Args)
+	case "red_task_report":
+		handleRedTaskReport(req.GeneralReq.Args)
+	}
+}
+
+func handleMapTaskReport(args []string) {
+	res := args[0]
+	mapTaskId := args[1]
+	// report all reducer, this map task is finished.
+	if res == "completed" {
+		log.Printf("LOG: Map task(%s) complete, report: %s. \n", mapTaskId, res)
+		taskStatus := getMapTasks(mapTaskId)
+		taskStatus.Status = "completed"
+		setMapTasks(mapTaskId, taskStatus)
+		mapMutex.Lock()
+		for reducerId, reducerInfo := range ReduceTasks {
+			conn, err := createConnection(reducerInfo.Worker)
+			if err != nil {
+				log.Println("ERROR: Fail to create connection with reducer. ", err)
+				continue
+			}
+			msgHandler := utility.NewMessageHandler(conn)
+			reqMsg := utility.Request{
+				Req: &utility.Request_RedTaskReq{
+					RedTaskReq: &utility.RedTaskReq{
+						MapTaskId:   mapTaskId,
+						RedTaskId:   reducerId,
+						MapperHost:  MapTasks[mapTaskId].Worker,
+						NumOfChunks: uint32(len(MapTasks)),
+					},
+				},
+			}
+			wrapper := &utility.Wrapper{
+				Msg: &utility.Wrapper_RequestMsg{
+					RequestMsg: &reqMsg,
+				},
+			}
+			err = msgHandler.Send(wrapper)
+			if err != nil {
+				log.Printf("ERROR: Fail to send reduce task request to %s. %s ", reducerInfo.Worker, err)
+				continue
+			}
+			log.Printf("LOG: Send reduce task request to node(%s). ", reducerInfo.Worker)
+			msgHandler.Close()
+		}
+		mapMutex.Unlock()
+	} else {
+		log.Printf("ERROR: Map task(%s) failes, report: %s. \n", mapTaskId, res)
+		taskStatus := getMapTasks(mapTaskId)
+		taskStatus.Status = "fail"
+		setMapTasks(mapTaskId, taskStatus)
+	}
+}
+
+func handleRedTaskReport(args []string) {
+	res := args[0]
+	redTaskId := args[1]
+	if res == "completed" {
+		log.Printf("LOG: Reduce task(%s) complete, report: %s. \n", redTaskId, res)
+		taskStatus := getReduceTasks(redTaskId)
+		taskStatus.Status = "completed"
+		setReduceTasks(redTaskId, taskStatus)
+	} else {
+		log.Printf("LOG: Reduce task(%s) failes, report: %s. \n", redTaskId, res)
+		taskStatus := getReduceTasks(redTaskId)
+		taskStatus.Status = "fail"
+		setReduceTasks(redTaskId, taskStatus)
+	}
 }
