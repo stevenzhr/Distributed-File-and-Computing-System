@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"plugin"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -290,7 +291,129 @@ func getPartitionFile(mapTaskId, redTaskId, mapperHost string) error {
 
 func runReduceTask() string {
 	log.Println("All map tasks have been completed. Start reduce tasks. ")
-	//
+	// use external sort to provide key-value pair to reduce method
+	scannerArr := make([]bufio.Scanner, len(partitionFileList))
+	bufferedKeyValueArr := make([][]string, len(partitionFileList))
+	for i, partitionFileName := range partitionFileList {
+		filepath := fmt.Sprintf("%sws/%s", config.VAULT_PATH, partitionFileName)
+		// sort each partition file
+		err := sortAfile(filepath)
+		if err != nil {
+			return "fail"
+		}
+		// create scanner for each file
+		file, err := os.Open(filepath)
+		defer file.Close()
+		scannerArr[i] = *bufio.NewScanner(file)
+		// read first line to fill the buffered key-value array
+		if scannerArr[i].Scan() {
+			bufferedKeyValueArr[i] = strings.SplitN(scannerArr[i].Text(), "-->", 2)
+		}
+	}
+	key, value := getMinKeyValue(bufferedKeyValueArr, scannerArr)
+	currentKey := key
+	valueArr := []string{value}
+	flag := true
+	for flag {
+		key, value := getMinKeyValue(bufferedKeyValueArr, scannerArr)
+		flag = key != ""
+		if key != currentKey {
+			log.Printf("key: %s, valueArr: %s \n", currentKey, valueArr) // FIXME: call reduce method
+			// goto next key
+			currentKey = key
+			valueArr = []string{value}
+		} else {
+			valueArr = append(valueArr, value)
+		}
+	}
+	return "completed"
+}
 
-	return "fail"
+func getMinKeyValue(bufferedKeyValueArr [][]string, scannerArr []bufio.Scanner) (string, string) {
+	var i, minKeyIndex int
+	// find first not null key's index
+	for i = 0; i < len(scannerArr); i++ {
+		if bufferedKeyValueArr[i][0] != "(n/a)" {
+			minKeyIndex = i
+			break
+		}
+	}
+	if i == len(scannerArr) {
+		return "", ""
+	}
+	// find the min key in the buffered key value array
+	remainScanner := len(scannerArr)
+	for i := 1; i < len(scannerArr); i++ {
+		if bufferedKeyValueArr[i][0] == "(n/a)" {
+			remainScanner--
+			continue
+		} else if bufferedKeyValueArr[i][0] < bufferedKeyValueArr[minKeyIndex][0] {
+			minKeyIndex = i
+		}
+	}
+	// finish go through all buffer and find min key
+	var key, value string
+	if remainScanner > 0 {
+		key = bufferedKeyValueArr[minKeyIndex][0]
+		value = bufferedKeyValueArr[minKeyIndex][1]
+	} else {
+		key = ""
+		value = ""
+	}
+	// update min key-value form file
+	if scannerArr[minKeyIndex].Scan() {
+		bufferedKeyValueArr[minKeyIndex] = strings.SplitN(scannerArr[minKeyIndex].Text(), "-->", 2)
+	} else {
+		bufferedKeyValueArr[minKeyIndex] = []string{"(n/a)", ""}
+	}
+	return key, value
+}
+
+func sortAfile(filename string) error {
+	// open file
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Printf("ERROR: Can not open file(%s). \n", filename)
+		return err
+	}
+	scanner := bufio.NewScanner(file)
+	// read all data to map
+	fileData := [][]string{}
+	for scanner.Scan() {
+		strs := strings.SplitN(scanner.Text(), "-->", 2)
+		fileData = append(fileData, strs)
+	}
+	file.Close()
+	// sort the array
+	sort.Slice(fileData, func(i, j int) bool {
+		return fileData[i][0] < fileData[j][0]
+	})
+	// remove the original file
+	err = os.Remove(filename)
+	if err != nil {
+		log.Printf("ERROR: Can not remove file(%s). \n", filename)
+		return err
+	}
+	// write sorted data to file
+	file, err = os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Println("ERROR: Error opening file: ", err)
+		return err
+	}
+	defer file.Close()
+	for _, lineArr := range fileData {
+		_, err := fmt.Fprintln(file, fmt.Sprintf("%s-->%s", lineArr[0], lineArr[1]))
+		if err != nil {
+			log.Println("ERROR: Error writing line to file: ", err)
+			return err
+		}
+	}
+	log.Printf("LOG: file(%s) has been successfully sort. \n", filename)
+	return nil
+}
+
+func handleOneReduceTask(key, value string, resFile *os.File) error {
+	// how to feed reduce method?
+
+	return nil
 }
