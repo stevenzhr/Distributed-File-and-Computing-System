@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"plugin"
 	"sort"
 	"strings"
@@ -86,7 +87,15 @@ func loadPlugin(soFilePath string, args []string) error {
 
 // handle map tasks base on chunk list in request
 func handleMapTasks(req *utility.Request_MapTaskReq, msgHandler *utility.MessageHandler) {
-	log.Println("LOG: Receive map tasks, start save so file. ")
+	log.Println("LOG: Receive map tasks, start init workspace. ")
+	err := initWorkSpace()
+	if err != nil {
+		err := sendGeneralReq("map_task_report", []string{"fail", ""}) //TODO: mananger receive report
+		if err != nil {
+			return
+		}
+	}
+	log.Println("LOG: Start save so file. ")
 	soFilePath, err := saveSoFile(req.MapTaskReq.SoChunk)
 	if err != nil {
 		log.Println("ERROR: Failed when load so file. Map task failed. ", err)
@@ -451,6 +460,24 @@ func handleOneReduceTask(key string, valueArr []string, resFile *os.File) error 
 	if err != nil {
 		log.Println("ERROR: Error writing line to file: ", err)
 		return err
+	}
+	return nil
+}
+
+func initWorkSpace() error {
+	folder := config.VAULT_PATH + "ws"
+	// Get a list of all files in the folder
+	fileList, err := filepath.Glob(filepath.Join(folder, "*"))
+	if err != nil {
+		log.Println("ERROR: Fail to get workspace's filelist. ", err)
+		return err
+	}
+	// Remove each file
+	for _, file := range fileList {
+		err := os.Remove(file)
+		if err != nil {
+			log.Println("ERROR: Error removing file:", err)
+		}
 	}
 	return nil
 }
