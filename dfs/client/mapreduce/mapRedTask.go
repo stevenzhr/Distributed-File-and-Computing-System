@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 type task string
 
@@ -18,17 +22,20 @@ func (t task) Init(strs []string) {
 
 func (t task) Map(index int, text string) ([]byte, []byte) {
 	var key, value []byte
-	fmt.Printf("Map task2 \n")
-	// FIXME: testing code
-	key = []byte(fmt.Sprintf("%d", index))
-	value = []byte(text)
+	key = []byte(strings.Split(text, ",")[1])
+	value = []byte("1")
 	return key, value
 }
 
-func (t task) Reduce(key []byte, values [][]byte) [][]byte {
-	var context [][]byte
-	fmt.Printf("Reduce task1 \n")
-
+func (t task) Reduce(key []byte, values [][]byte) []byte {
+	var context []byte
+	keyStr := string(key)
+	var sum int
+	for i := 0; i < len(values); i++ {
+		num, _ := strconv.Atoi(string(values[i]))
+		sum += num
+	}
+	context = []byte(fmt.Sprintf("%s,%d", keyStr, sum))
 	return context
 }
 

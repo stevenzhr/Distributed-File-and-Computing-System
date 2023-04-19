@@ -57,6 +57,7 @@ func handleClientRequest(msgHandler *utility.MessageHandler) {
 }
 
 func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
+	fmt.Printf("Receive MapReduce task(%s) from client. \n", mapredReq.GetInputFile().GetFilename())
 	// assume accept response for now
 	generalRes := utility.GeneralRes{
 		ResType: "accept",

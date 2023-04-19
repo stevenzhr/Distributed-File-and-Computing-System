@@ -14,7 +14,7 @@ import (
 type Task interface {
 	Init(args []string)
 	Map(index int, text string) ([]byte, []byte)
-	Reduce(key []byte, values [][]byte) [][]byte
+	Reduce(key []byte, values [][]byte) []byte
 	GetNumOfReducer() int
 }
 
@@ -283,6 +283,7 @@ func assignMapTasks(mapAssignment *map[string][]string, soChunk *utility.Chunk, 
 			continue
 		}
 		msgHandler.Close()
+		fmt.Printf("Assign map tasks to node(%s). \n", nodeHost)
 	}
 }
 

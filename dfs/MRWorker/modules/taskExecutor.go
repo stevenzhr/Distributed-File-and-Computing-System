@@ -22,7 +22,7 @@ type context struct {
 type Task interface {
 	Init(args []string)
 	Map(index int, text string) ([]byte, []byte)
-	Reduce(key []byte, values [][]byte) [][]byte
+	Reduce(key []byte, values [][]byte) []byte
 	GetNumOfReducer() int
 }
 
@@ -89,12 +89,12 @@ func handleMapTasks(req *utility.Request_MapTaskReq, msgHandler *utility.Message
 	log.Println("LOG: Receive map tasks, start save so file. ")
 	soFilePath, err := saveSoFile(req.MapTaskReq.SoChunk)
 	if err != nil {
-		log.Println("ERROR: Map task failed. ", err)
+		log.Println("ERROR: Failed when load so file. Map task failed. ", err)
 		return
 	}
 	err = loadPlugin(soFilePath, req.MapTaskReq.Parameters)
 	if err != nil {
-		log.Println("ERROR: Map task failed. ", err)
+		log.Println("ERROR: Failed when load plugin Map task failed. ", err)
 		return
 	}
 	// run task one by one
@@ -222,12 +222,23 @@ func handleReduceTasks(req *utility.Request_RedTaskReq, msgHandler *utility.Mess
 	}
 	// wait until all map task has finished.
 	if len(partitionFileList) >= totalChunkNum {
-		res := runReduceTask()
-		err := sendGeneralReq("red_task_report", []string{res, redTaskId})
+		outputFilename := fmt.Sprintf("%s_r%s", strings.SplitN(mapTaskId, "_", 2)[0], strings.Split(redTaskId, "p")[1])
+		res, filepath := runReduceTasks(outputFilename)
+		// TODO: send outputfile to controller
+		err := sendFileToDFS(filepath)
+		if err != nil {
+			res = "fail"
+		}
+		err = sendGeneralReq("red_task_report", []string{res, redTaskId, outputFilename})
 		if err != nil {
 			return
 		}
 	}
+}
+
+func sendFileToDFS(filepath string) error {
+	log.Printf("LOG: Start send output file(%s) to DFS. \n", filepath)
+	return nil
 }
 
 func getPartitionFile(mapTaskId, redTaskId, mapperHost string) error {
@@ -289,8 +300,17 @@ func getPartitionFile(mapTaskId, redTaskId, mapperHost string) error {
 	return nil
 }
 
-func runReduceTask() string {
+func runReduceTasks(outputFilename string) (string, string) {
 	log.Println("All map tasks have been completed. Start reduce tasks. ")
+	// create reducer output file
+	filepath := fmt.Sprintf("%sws/%s", config.VAULT_PATH, outputFilename)
+	file, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Println("ERROR: Error opening file: ", err)
+		return "fail", ""
+	}
+	defer file.Close()
+	log.Printf("LOG: Create output file(%s). \n", filepath)
 	// use external sort to provide key-value pair to reduce method
 	scannerArr := make([]bufio.Scanner, len(partitionFileList))
 	bufferedKeyValueArr := make([][]string, len(partitionFileList))
@@ -299,7 +319,7 @@ func runReduceTask() string {
 		// sort each partition file
 		err := sortAfile(filepath)
 		if err != nil {
-			return "fail"
+			return "fail", ""
 		}
 		// create scanner for each file
 		file, err := os.Open(filepath)
@@ -310,6 +330,7 @@ func runReduceTask() string {
 			bufferedKeyValueArr[i] = strings.SplitN(scannerArr[i].Text(), "-->", 2)
 		}
 	}
+	// finish sort all partition files, start shuffle
 	key, value := getMinKeyValue(bufferedKeyValueArr, scannerArr)
 	currentKey := key
 	valueArr := []string{value}
@@ -318,7 +339,12 @@ func runReduceTask() string {
 		key, value := getMinKeyValue(bufferedKeyValueArr, scannerArr)
 		flag = key != ""
 		if key != currentKey {
-			log.Printf("key: %s, valueArr: %s \n", currentKey, valueArr) // FIXME: call reduce method
+			// log.Printf("key: %s, valueArr: %s \n", currentKey, valueArr)
+			// call reduce method
+			err := handleOneReduceTask(currentKey, valueArr, file)
+			if err != nil {
+				return "fail", ""
+			}
 			// goto next key
 			currentKey = key
 			valueArr = []string{value}
@@ -326,7 +352,8 @@ func runReduceTask() string {
 			valueArr = append(valueArr, value)
 		}
 	}
-	return "completed"
+	log.Println("LOG: All reduce tasks complete. Prepare send output file. ")
+	return "completed", filepath
 }
 
 func getMinKeyValue(bufferedKeyValueArr [][]string, scannerArr []bufio.Scanner) (string, string) {
@@ -412,8 +439,18 @@ func sortAfile(filename string) error {
 	return nil
 }
 
-func handleOneReduceTask(key, value string, resFile *os.File) error {
-	// how to feed reduce method?
-
+func handleOneReduceTask(key string, valueArr []string, resFile *os.File) error {
+	keyByteArr := []byte(key)
+	var valueArrByteArr [][]byte
+	for i := 0; i < len(valueArr); i++ {
+		valueByteArr := []byte(valueArr[i])
+		valueArrByteArr = append(valueArrByteArr, valueByteArr)
+	}
+	contextByteArr := mapRedTask.Reduce(keyByteArr, valueArrByteArr)
+	_, err := fmt.Fprintln(resFile, string(contextByteArr))
+	if err != nil {
+		log.Println("ERROR: Error writing line to file: ", err)
+		return err
+	}
 	return nil
 }
