@@ -2,6 +2,7 @@ package main
 
 import (
 	. "dfs/MRWorker/modules"
+	"dfs/config"
 	"dfs/utility"
 	"fmt"
 	"log"
@@ -21,6 +22,14 @@ func main() {
 	}
 	defer logFile.Close()
 	log.SetOutput(logFile)
+
+	err = os.MkdirAll(config.VAULT_PATH+"ws/", os.ModePerm)
+	// err = os.MkdirAll("vault/ws/", os.ModePerm) //FIXME: for testing only, re-comment when deploy
+	if err != nil {
+		log.Println("ERROR: Can't create or open workspace folder. ", err)
+		fmt.Println("ERROR: Can't create or open workspace folder. ", err)
+		return
+	}
 
 	// create listener socket
 	mrListener, err := CreateListener()

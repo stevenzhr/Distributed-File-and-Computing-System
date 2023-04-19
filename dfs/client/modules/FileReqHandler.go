@@ -118,10 +118,14 @@ func StoreFile(reqStr []string) bool {
 	resType := resWrapper.GetResponseMsg().GetGeneralRes().GetResType()
 	switch resType {
 	case "accept":
-		responseArgs := resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()
-		log.Println("LOG: accept response. Args: ", responseArgs)
+		nodeHostList := resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()
+		log.Println("LOG: accept response. NodeList: ", nodeHostList)
 		// Split file and send chunks to node
-		sendFile(path, fileSize, chunkSize, responseArgs)
+		if ext := filepath.Ext(filename); ext == ".csv" || ext == ".txt" {
+			sendTxtFile(filename, nodeHostList)
+		} else {
+			sendFile(path, fileSize, chunkSize, nodeHostList)
+		}
 	case "deny":
 		resStr := resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()[0]
 		log.Printf("WARNING: Request denied by controller.[%s] \n", resStr)
@@ -138,8 +142,8 @@ func getFileByLine(fileName string, fileSize uint64, chunkSize int) int {
 	// TODO: fill the code
 	file, err := os.Open(fileName)
 	if err != nil {
-		log.Printf("ERROR: Can not open file(%s). %s", fileName, err)
-		fmt.Printf("ERROR: Can not open file(%s). %s", fileName, err)
+		log.Printf("ERROR: Can not open file(%s). %s\n", fileName, err)
+		fmt.Printf("Can not open file(%s). %s\n", fileName, err)
 		return 0
 	}
 	defer file.Close()
@@ -188,8 +192,38 @@ func getFileByLine(fileName string, fileSize uint64, chunkSize int) int {
 	return i
 }
 
+func sendTxtFile(fileName string, nodeHostList []string) {
+	numOfChunk := len(nodeHostList)
+	ch := make(chan bool, numOfChunk)
+	for i := 0; i < numOfChunk; i++ {
+		chunkFileName := fmt.Sprintf("temp/%s_%d-%d.cnk", fileName, i+1, numOfChunk)
+		chunkData, err := ioutil.ReadFile(chunkFileName)
+		if err != nil {
+			log.Printf("ERROR: Can not open chunk file(%s). %s", chunkFileName, err)
+			// ch <- false
+			continue
+			// TODO: process if chunk read fail, rm local chunks and rm remote file info.
+		}
+		pipingList := strings.Split(nodeHostList[i], ",")
+		wg.Add(1)
+		go processChunk(chunkFileName, chunkData, pipingList, ch)
+		log.Println("LOG: Process chunk end. ")
+	}
+	wg.Wait()
+	//check if all results in channel are true
+	for i := 0; i < numOfChunk; i++ {
+		value, _ := <-ch
+		if !value {
+			DeleteFile([]string{"delete", fileName})
+			break
+		}
+	}
+	log.Println("LOG: Send file end. ")
+	fmt.Println("LOG: Send file successfully.")
+}
+
 // splite file to chunks and send them by response node list
-func sendFile(path string, fileSize uint64, chunkSize int, responseArgs []string) {
+func sendFile(path string, fileSize uint64, chunkSize int, nodeHostList []string) {
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatalln(err.Error())
@@ -213,7 +247,7 @@ func sendFile(path string, fileSize uint64, chunkSize int, responseArgs []string
 	fmt.Printf("Start sending %d chunks, each of size %s byte.\n", numOfChunk, formattedChunkSize)
 	// TODO: re-write split chunk method
 	for i := 0; i < numOfChunk; i++ {
-		log.Printf("LOG: Start send chunks: %d/%d to Node: %s \n", i+1, numOfChunk, strings.Split(responseArgs[i], ",")[0])
+		log.Printf("LOG: Start send chunks: %d/%d to Node: %s \n", i+1, numOfChunk, strings.Split(nodeHostList[i], ",")[0])
 		// fmt.Printf("Start send chunks: %d/%d to Node: %s \n", i+1, numOfChunk, strings.Split(responseArgs[i], ",")[0])
 		chunkData := make([]byte, chunkSize)
 		n, err := reader.Read(chunkData)
@@ -228,7 +262,7 @@ func sendFile(path string, fileSize uint64, chunkSize int, responseArgs []string
 		// process chunk and send
 		fileName := fmt.Sprintf("%s_%d-%d", filepath.Base(path), i+1, numOfChunk) // if need change, also have to change in controller
 		wg.Add(1)
-		pipingList := strings.Split(responseArgs[i], ",")
+		pipingList := strings.Split(nodeHostList[i], ",")
 		go processChunk(fileName, chunkData, pipingList, ch)
 		log.Println("LOG: Process chunk end. ")
 	}
@@ -246,30 +280,35 @@ func sendFile(path string, fileSize uint64, chunkSize int, responseArgs []string
 }
 
 // send chunk by piping list
-func processChunk(fileName string, chunkData []byte, pipingList []string, ch chan<- bool) {
+func processChunk(chunkFileName string, chunkData []byte, pipingList []string, ch chan<- bool) {
 	defer wg.Done()
 	// prepare chunk
-	fileName += ".cnk"
-	filePath := "temp/" + fileName
-	err := os.MkdirAll("temp/", os.ModePerm)
-	if err != nil {
-		log.Println("ERROR: Can't create or open temp folder. ", err)
-		fmt.Println("ERROR: Can't create or open temp folder. ", err)
-		ch <- false
-		return
+	var path string
+	if ext := filepath.Ext(chunkFileName); ext != ".cnk" {
+		chunkFileName += ".cnk"
+		filePath := "temp/" + chunkFileName
+		err := os.MkdirAll("temp/", os.ModePerm)
+		if err != nil {
+			log.Println("ERROR: Can't create or open temp folder. ", err)
+			fmt.Println("ERROR: Can't create or open temp folder. ", err)
+			ch <- false
+			return
+		}
+		err = ioutil.WriteFile(filePath, chunkData, 0666)
+		if err != nil {
+			log.Println("ERROR: Can't create chunkfile. ", err)
+			fmt.Println("ERROR: Can't create chunkfile. ", err)
+			ch <- false
+			return
+		}
+	} else {
+		path = chunkFileName
 	}
-	err = ioutil.WriteFile(filePath, chunkData, 0666)
+	_, checksum, err := utility.FileInfo(path)
+	err = os.Remove(path)
 	if err != nil {
-		log.Println("ERROR: Can't create chunkfile. ", err)
-		fmt.Println("ERROR: Can't create chunkfile. ", err)
-		ch <- false
-		return
-	}
-	_, checksum, err := utility.FileInfo(filePath)
-	err = os.Remove(filePath)
-	if err != nil {
-		log.Println("ERROR: Can't delete temp chunkfile. ", err)
-		fmt.Println("ERROR: Can't delete temp chunkfile. ", err)
+		log.Printf("ERROR: Can't delete temp chunkfile(%s). %s\n", path, err)
+		fmt.Printf("ERROR: Can't delete temp chunkfile(%s). %s\n", path, err)
 		ch <- false
 		return
 	}
@@ -283,7 +322,7 @@ func processChunk(fileName string, chunkData []byte, pipingList []string, ch cha
 		if len(pipingList) > 1 {
 			pipingList = pipingList[1:]
 			wg.Add(1)
-			processChunk(fileName, chunkData, pipingList, ch)
+			processChunk(chunkFileName, chunkData, pipingList, ch)
 			return
 		} else {
 			log.Println("ERROR: All candidate nodes failed. Upload file failed. ")
@@ -296,7 +335,7 @@ func processChunk(fileName string, chunkData []byte, pipingList []string, ch cha
 	nodeMsgHandler := utility.NewMessageHandler(conn)
 	// package chunk
 	chunk := utility.Chunk{
-		FileName:   fileName,
+		FileName:   filepath.Base(chunkFileName),
 		Checksum:   checksum,
 		Size:       uint64(len(chunkData)),
 		PipingList: pipingList,
@@ -323,7 +362,7 @@ func processChunk(fileName string, chunkData []byte, pipingList []string, ch cha
 		if len(pipingList) > 1 {
 			pipingList = pipingList[1:]
 			wg.Add(1)
-			processChunk(fileName, chunkData, pipingList, ch)
+			processChunk(chunkFileName, chunkData, pipingList, ch)
 			return
 		} else {
 			log.Println("ERROR: All candidate nodes failed. Upload file failed. ")
@@ -343,8 +382,10 @@ func processChunk(fileName string, chunkData []byte, pipingList []string, ch cha
 	resType := resWrapper.GetResponseMsg().GetGeneralRes().GetResType()
 	switch resType {
 	case "accept":
+		log.Println("LOG: Nodes accept put chunk req. ")
 		ch <- true
 	default:
+		log.Println("WARNING: Nodes deny put chunk req. ")
 		ch <- false
 	}
 }

@@ -10,16 +10,9 @@ import (
 	"sync"
 )
 
-type TaskStatus struct {
-	Status string // idle, completed
-	Worker string // host:worker_port
-}
-
 var (
 	workersMutex sync.RWMutex
-	Workers      map[string]string     // key: orion01, value: (orion01:workerport)
-	MapTasks     map[string]TaskStatus //key: chunk name,   value: TaskStatus
-	ReduceTasks  map[string]TaskStatus //key: p1,  value: TaskStatus
+	Workers      map[string]string // key: orion01, value: (orion01:workerport)
 )
 
 func init() {
@@ -54,9 +47,9 @@ func handleWorkerRequest(msgHandler *utility.MessageHandler) {
 	if msg, ok := wrapper.Msg.(*utility.Wrapper_RequestMsg); ok {
 		if req, ok := msg.RequestMsg.Req.(*utility.Request_JoinReq); ok {
 			handleJoin(req.JoinReq.NodeHostPort, msgHandler)
+		} else if req, ok := msg.RequestMsg.Req.(*utility.Request_GeneralReq); ok {
+			go handleTaskReport(req)
 		}
-	} else if _, ok := wrapper.Msg.(*utility.Wrapper_HeartbeatMsg); ok {
-		//TODO: handle task report
 	} else {
 		fmt.Println("Invalid request. ")
 	}

@@ -10,8 +10,7 @@ import (
 )
 
 // worker to manager connection initialization
-func createConnection() (net.Conn, error) {
-	host := os.Args[1]
+func createConnection(host string) (net.Conn, error) {
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
 		log.Println("ERROR: Can't establish connection with manager. Please check host name. ")
@@ -21,7 +20,7 @@ func createConnection() (net.Conn, error) {
 }
 
 func JoinServer() error {
-	conn, err := createConnection()
+	conn, err := createConnection(os.Args[1])
 	if err != nil {
 		return err
 	}

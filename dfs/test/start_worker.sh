@@ -21,13 +21,13 @@ servers=(
 )
 
 for (( i = 0; i < nodes; i++ )); do
-    port=$(( port_prefix * 1000 + i + 350 ))
+    port=$(( port_prefix * 1000 + i + 420 ))
     server=$(( i % ${#servers[@]} ))
 
     # This will ssh to the machine, and run 'node orion01 <some port>' in the
     # background.
     echo "Starting worker on ${servers[${server}]} on port ${port}"
-    ssh ${servers[${server}]} "${HOME}/CS677-BigData/P2-map_increase/dfs/MRWorker/worker orion02:26997 ${port}" &
+    ssh ${servers[${server}]} "${HOME}/CS677-BigData/P2-map_increase/dfs/MRWorker/worker orion02:28997 ${port}" &
 done
 
 echo "Startup complete"

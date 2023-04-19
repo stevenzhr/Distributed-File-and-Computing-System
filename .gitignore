@@ -2,6 +2,9 @@
 *.json
 *.cnk
 *.sh
+*.so
 dfs/test/start.sh
-.gitignore
 dfs/config/config.go
+dfs/node/node
+dfs/MRWorker/worker
+dfs/test/start_worker.sh

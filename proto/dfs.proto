@@ -9,6 +9,9 @@ message Request {
         StatusReq status_req = 3;
         JoinReq join_req = 4;
         MapRedReq mapred_req = 5;
+        MapTaskReq map_task_req = 6;
+        RedTaskReq red_task_req = 7;
+        GeneralReq general_req = 8;
     }
 }
 
@@ -18,12 +21,31 @@ message FileReq {
     File file_info = 2;
 }
 
+message GeneralReq {
+    string req_type = 1;                // map_task_report, red_task_report
+    repeated string args = 2;
+}
+
 message File {
     string filename = 1;
     string checksum = 2;
     uint64 file_size = 3;
     uint64 chunk_size = 4;
     repeated string chunk_node_list = 5;
+}
+
+message MapTaskReq {
+    Chunk so_chunk = 1;
+    repeated string input_list = 2;
+    repeated string parameters = 3;
+}
+
+message RedTaskReq {
+    Chunk so_chunk = 1;
+    string map_task_id = 2;
+    string red_task_id = 3;
+    string mapper_host = 4;
+    uint32 num_of_chunks = 5;
 }
 
 message MapRedReq {
