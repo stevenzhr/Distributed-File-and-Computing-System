@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 //go run node.go orion02:xx997 xx620(listen port)
@@ -31,6 +32,8 @@ func main() {
 		return
 	}
 
+	initWorkSpace()
+
 	// create listener socket
 	mrListener, err := CreateListener()
 	if err != nil {
@@ -49,4 +52,22 @@ func main() {
 
 func workerShutDown() {
 	fmt.Println("Shut down MapReduce Worker, BYE!")
+}
+
+func initWorkSpace() error {
+	folder := config.VAULT_PATH + "ws"
+	// Get a list of all files in the folder
+	fileList, err := filepath.Glob(filepath.Join(folder, "*"))
+	if err != nil {
+		log.Println("ERROR: Fail to get workspace's filelist. ", err)
+		return err
+	}
+	// Remove each file
+	for _, file := range fileList {
+		err := os.Remove(file)
+		if err != nil {
+			log.Println("ERROR: Error removing file:", err)
+		}
+	}
+	return nil
 }

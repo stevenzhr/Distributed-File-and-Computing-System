@@ -46,6 +46,7 @@ message RedTaskReq {
     string red_task_id = 3;
     string mapper_host = 4;
     uint32 num_of_chunks = 5;
+    string controller_host = 6;
 }
 
 message MapRedReq {
@@ -53,6 +54,7 @@ message MapRedReq {
     File input_file = 2;
     string output_name = 3;
     repeated string parameters = 4;
+    string controller_host = 5;
 }
 
 /* Chunk request*/

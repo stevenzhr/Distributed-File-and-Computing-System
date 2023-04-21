@@ -282,11 +282,12 @@ func sendFile(path string, fileSize uint64, chunkSize int, nodeHostList []string
 // send chunk by piping list
 func processChunk(chunkFileName string, chunkData []byte, pipingList []string, ch chan<- bool) {
 	defer wg.Done()
+	log.Printf("LOG: Start sending chunk(%s) to node(%s). \n", chunkFileName, pipingList[0])
 	// prepare chunk
 	var path string
 	if ext := filepath.Ext(chunkFileName); ext != ".cnk" {
 		chunkFileName += ".cnk"
-		filePath := "temp/" + chunkFileName
+		path = "temp/" + chunkFileName
 		err := os.MkdirAll("temp/", os.ModePerm)
 		if err != nil {
 			log.Println("ERROR: Can't create or open temp folder. ", err)
@@ -294,7 +295,7 @@ func processChunk(chunkFileName string, chunkData []byte, pipingList []string, c
 			ch <- false
 			return
 		}
-		err = ioutil.WriteFile(filePath, chunkData, 0666)
+		err = ioutil.WriteFile(path, chunkData, 0666)
 		if err != nil {
 			log.Println("ERROR: Can't create chunkfile. ", err)
 			fmt.Println("ERROR: Can't create chunkfile. ", err)
@@ -305,6 +306,12 @@ func processChunk(chunkFileName string, chunkData []byte, pipingList []string, c
 		path = chunkFileName
 	}
 	_, checksum, err := utility.FileInfo(path)
+	if err != nil {
+		log.Printf("ERROR: Can't get chunkfile(%s) info, Err msg: %s. \n", path, err)
+		ch <- false
+		return
+	}
+	log.Printf("LOG: Delete temp chunkfile(%s). \n", path)
 	err = os.Remove(path)
 	if err != nil {
 		log.Printf("ERROR: Can't delete temp chunkfile(%s). %s\n", path, err)

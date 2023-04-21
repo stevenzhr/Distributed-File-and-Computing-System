@@ -55,7 +55,7 @@ func main() {
 			return
 		case "put": // store filename filesize(MB)
 			if len(reqStrs) < 2 {
-				fmt.Println("Please input upload filename. [store example.txt 5]")
+				fmt.Println("Please input upload filename. [put example.txt 5]")
 			} else {
 				alive = StoreFile(reqStrs)
 			}
@@ -67,7 +67,7 @@ func main() {
 			}
 		case "rm": // delete filename
 			if len(reqStrs) != 2 {
-				fmt.Println("Please input upload filename. [delete example.txt]")
+				fmt.Println("Please input upload filename. [rm example.txt]")
 			} else {
 				alive = DeleteFile(reqStrs)
 			}

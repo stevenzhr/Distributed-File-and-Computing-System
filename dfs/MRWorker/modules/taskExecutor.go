@@ -2,6 +2,7 @@ package workerModules
 
 import (
 	"bufio"
+	client "dfs/client/modules"
 	"dfs/config"
 	"dfs/utility"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"plugin"
 	"sort"
 	"strings"
@@ -87,14 +87,7 @@ func loadPlugin(soFilePath string, args []string) error {
 
 // handle map tasks base on chunk list in request
 func handleMapTasks(req *utility.Request_MapTaskReq, msgHandler *utility.MessageHandler) {
-	log.Println("LOG: Receive map tasks, start init workspace. ")
-	err := initWorkSpace()
-	if err != nil {
-		err := sendGeneralReq("map_task_report", []string{"fail", ""}) //TODO: mananger receive report
-		if err != nil {
-			return
-		}
-	}
+	log.Println("LOG: Receive map tasks. ", req.MapTaskReq.InputList)
 	log.Println("LOG: Start save so file. ")
 	soFilePath, err := saveSoFile(req.MapTaskReq.SoChunk)
 	if err != nil {
@@ -220,6 +213,7 @@ func handleReduceTasks(req *utility.Request_RedTaskReq, msgHandler *utility.Mess
 	mapTaskId := req.RedTaskReq.MapTaskId
 	redTaskId := req.RedTaskReq.RedTaskId
 	mapperHost := req.RedTaskReq.MapperHost
+	controllerHost := req.RedTaskReq.ControllerHost
 	totalChunkNum := int(req.RedTaskReq.NumOfChunks)
 	log.Printf("LOG: Receive reduce task:%s, mapTaskId: %s, mapperHost: %s, totalChunkNum: %d \n", redTaskId, mapTaskId, mapperHost, totalChunkNum)
 	err := getPartitionFile(mapTaskId, redTaskId, mapperHost)
@@ -232,7 +226,7 @@ func handleReduceTasks(req *utility.Request_RedTaskReq, msgHandler *utility.Mess
 	// wait until all map task has finished.
 	if len(partitionFileList) >= totalChunkNum {
 		outputFilename := fmt.Sprintf("%s_r%s", strings.SplitN(mapTaskId, "_", 2)[0], strings.Split(redTaskId, "p")[1])
-		res, filepath := runReduceTasks(outputFilename)
+		res, filepath := runReduceTasks(outputFilename, controllerHost)
 		// TODO: send outputfile to controller
 		err := sendFileToDFS(filepath)
 		if err != nil {
@@ -303,13 +297,13 @@ func getPartitionFile(mapTaskId, redTaskId, mapperHost string) error {
 			log.Println("WARNING: Can't write partition file. ", err.Error())
 			return err
 		}
-		log.Printf("LOG: Successful receive and save partition req(%s) to node(%s). \n", partitionFileName, mapperHost)
+		log.Printf("LOG: Successful receive and save partition req(%s) from node(%s). \n", partitionFileName, mapperHost)
 	}
 	addPartitionFile(partitionFileName)
 	return nil
 }
 
-func runReduceTasks(outputFilename string) (string, string) {
+func runReduceTasks(outputFilename, controllerHost string) (string, string) {
 	log.Println("All map tasks have been completed. Start reduce tasks. ")
 	// create reducer output file
 	filepath := fmt.Sprintf("%sws/%s", config.VAULT_PATH, outputFilename)
@@ -361,7 +355,19 @@ func runReduceTasks(outputFilename string) (string, string) {
 			valueArr = append(valueArr, value)
 		}
 	}
-	log.Println("LOG: All reduce tasks complete. Prepare send output file. ")
+	log.Printf("LOG: All reduce tasks complete. Prepare send output file(%s) to controller(%s). \n", outputFilename, controllerHost)
+	conn, err := createConnection(controllerHost)
+	if err != nil {
+		log.Printf("ERROR: Can not create connection to DFS controller(%s). \n", controllerHost)
+		return "fail", ""
+	}
+	client.SetMsgHandler(utility.NewMessageHandler(conn))
+	putReqStr := []string{"put", filepath}
+	success := client.StoreFile(putReqStr)
+	if !success {
+		return "fail", ""
+	}
+	log.Printf("LOG: Reducer output file(%s) has been successfully send to controller(%s). \n", outputFilename, controllerHost)
 	return "completed", filepath
 }
 
@@ -407,6 +413,7 @@ func getMinKeyValue(bufferedKeyValueArr [][]string, scannerArr []bufio.Scanner) 
 
 func sortAfile(filename string) error {
 	// open file
+	log.Printf("LOG: Start sort partition file(%s). \n", filename)
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Printf("ERROR: Can not open file(%s). \n", filename)
@@ -460,24 +467,6 @@ func handleOneReduceTask(key string, valueArr []string, resFile *os.File) error 
 	if err != nil {
 		log.Println("ERROR: Error writing line to file: ", err)
 		return err
-	}
-	return nil
-}
-
-func initWorkSpace() error {
-	folder := config.VAULT_PATH + "ws"
-	// Get a list of all files in the folder
-	fileList, err := filepath.Glob(filepath.Join(folder, "*"))
-	if err != nil {
-		log.Println("ERROR: Fail to get workspace's filelist. ", err)
-		return err
-	}
-	// Remove each file
-	for _, file := range fileList {
-		err := os.Remove(file)
-		if err != nil {
-			log.Println("ERROR: Error removing file:", err)
-		}
 	}
 	return nil
 }

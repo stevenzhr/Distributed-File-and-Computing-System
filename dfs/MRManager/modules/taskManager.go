@@ -325,10 +325,11 @@ func handleMapTaskReport(args []string) {
 			reqMsg := utility.Request{
 				Req: &utility.Request_RedTaskReq{
 					RedTaskReq: &utility.RedTaskReq{
-						MapTaskId:   mapTaskId,
-						RedTaskId:   reducerId,
-						MapperHost:  MapTasks[mapTaskId].Worker,
-						NumOfChunks: uint32(len(MapTasks)),
+						MapTaskId:      mapTaskId,
+						RedTaskId:      reducerId,
+						MapperHost:     MapTasks[mapTaskId].Worker,
+						NumOfChunks:    uint32(len(MapTasks)),
+						ControllerHost: controllerHost,
 					},
 				},
 			}

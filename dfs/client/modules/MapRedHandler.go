@@ -112,10 +112,11 @@ func sendMRRequest(mrMsgHandler *utility.MessageHandler, soChunk *utility.Chunk,
 	reqMsg := utility.Request{
 		Req: &utility.Request_MapredReq{
 			MapredReq: &utility.MapRedReq{
-				SoChunk:    soChunk,
-				InputFile:  inputFile,
-				OutputName: outputName,
-				Parameters: parameters,
+				SoChunk:        soChunk,
+				InputFile:      inputFile,
+				OutputName:     outputName,
+				Parameters:     parameters,
+				ControllerHost: os.Args[1],
 			},
 		},
 	}

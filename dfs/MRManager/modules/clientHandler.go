@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	flag bool
+	flag           bool
+	controllerHost string
 )
 
 func ListenClientConn(wg *sync.WaitGroup) {
@@ -101,6 +102,7 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 	if err != nil {
 		// TODO: fail to init task, prepare rollback
 	}
+	controllerHost = mapredReq.GetControllerHost()
 	log.Println("LOG: Finish init map & reduce task table. ")
 	updateMapTasks(mapAssignment)
 	log.Println("LOG: Finish update map task table. ")
