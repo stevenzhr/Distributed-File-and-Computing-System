@@ -55,6 +55,18 @@ func setReduceTasks(key string, value TaskStatus) {
 	mapMutex.Unlock()
 }
 
+func checkRedJobDone() bool {
+	mapMutex.RLock()
+	defer mapMutex.RUnlock()
+	for taskId := range ReduceTasks {
+		status := ReduceTasks[taskId]
+		if status.Status != "completed" {
+			return false
+		}
+	}
+	return true
+}
+
 // get a map of (chunk : 3 nodes)
 // transfer it into (node : chunks store on it)
 // always assign the node with the least number of choices(chunks)
@@ -368,5 +380,9 @@ func handleRedTaskReport(args []string) {
 		taskStatus := getReduceTasks(redTaskId)
 		taskStatus.Status = "fail"
 		setReduceTasks(redTaskId, taskStatus)
+	}
+	if checkRedJobDone() {
+		log.Printf("LOG: All reduce tasks completed. \n")
+		fmt.Printf("MapReduce job completed. \n")
 	}
 }
