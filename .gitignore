@@ -8,3 +8,4 @@ dfs/config/config.go
 dfs/node/node
 dfs/MRWorker/worker
 dfs/test/start_worker.sh
+dfs/test/start.sh

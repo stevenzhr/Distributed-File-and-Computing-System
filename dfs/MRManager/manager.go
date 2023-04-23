@@ -3,6 +3,7 @@ package main
 import (
 	. "dfs/MRManager/modules"
 	"dfs/utility"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -27,6 +28,8 @@ func main() {
 	log.SetOutput(logFile)
 
 	// manager start up process
+	fmt.Printf("MapReduce Manager start. %s: worker connection; %s client connection\n", os.Args[1], os.Args[2])
+	log.Printf("MapReduce Manager start. %s: worker connection; %s client connection\n", os.Args[1], os.Args[2])
 
 	wg.Add(1)
 	// start listen worker req

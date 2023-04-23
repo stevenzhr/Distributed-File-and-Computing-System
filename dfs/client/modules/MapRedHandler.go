@@ -75,34 +75,47 @@ func MapReduce(reqStr []string, managerHost string) bool {
 		return false
 	}
 	// receive response
-	err = getMRResponse(mrMsgHandler)
-	if err != nil {
-		return false
+	completed := false // a flag reflecting whether the job is completed
+	for !completed {
+		completed, err = getMRResponse(mrMsgHandler)
+		if err != nil {
+			return false
+		}
 	}
-	// TODO: 不应该直接结束，要等结果完成了再结束
+
 	return true
 }
 
-func getMRResponse(mrMsgHandler *utility.MessageHandler) error {
+func getMRResponse(mrMsgHandler *utility.MessageHandler) (bool, error) {
 	resWrapper, err := mrMsgHandler.Receive()
 	if err != nil {
 		fmt.Println("Connection error when unpackage from controller. Please exit. ")
 		log.Printf("WARNING: Connection error receiving response from controller. (%s)\n", err.Error())
-		return err
+		return true, err
 	}
 	resType := resWrapper.GetResponseMsg().GetGeneralRes().GetResType()
 	switch resType {
 	case "accept":
 		log.Println("LOG: MapReduce request accepted.")
-		fmt.Println("MapReduce request accepted.")
+		return false, nil
+	case "report":
+		log.Printf("LOG: report - %s", resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()[0])
+		fmt.Println(resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()[0])
+		return false, nil
+	case "complete":
+		log.Println("LOG: MapReduce job complete.")
+		fmt.Println("MapReduce job complete.")
+		return true, nil
 	case "deny":
 		log.Println("WARNING: MapReduce request denied by manager.")
 		fmt.Println("MapReduce request denied by manager.")
+		return true, nil
 	default:
 		log.Println("WARNING: Unknown error when package from controller.(Can't parse response type) ")
 		fmt.Println("Unknown error when package from controller.(Can't parse response type) ")
+		return true, nil
 	}
-	return nil
+
 }
 
 func sendMRRequest(mrMsgHandler *utility.MessageHandler, soChunk *utility.Chunk,

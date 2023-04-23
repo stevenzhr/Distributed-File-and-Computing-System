@@ -13,6 +13,8 @@ import (
 var (
 	flag           bool
 	controllerHost string
+	msgHandler     *utility.MessageHandler
+	OutputFileName string
 )
 
 func ListenClientConn(wg *sync.WaitGroup) {
@@ -24,8 +26,8 @@ func ListenClientConn(wg *sync.WaitGroup) {
 	}
 	for flag {
 		if conn, err := listener.Accept(); err == nil {
-			msgHandler := utility.NewMessageHandler(conn)
-			go handleClientRequest(msgHandler)
+			msgHandler = utility.NewMessageHandler(conn)
+			go handleClientRequest()
 			if !flag {
 				break
 			}
@@ -33,8 +35,8 @@ func ListenClientConn(wg *sync.WaitGroup) {
 	}
 }
 
-func handleClientRequest(msgHandler *utility.MessageHandler) {
-	defer msgHandler.Close()
+func handleClientRequest() {
+	// defer msgHandler.Close()
 	// start receive client request wrapper
 	wrapper, err := msgHandler.Receive()
 	if err != nil {
@@ -63,6 +65,9 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 	generalRes := utility.GeneralRes{
 		ResType: "accept",
 	}
+	// save output file name
+	OutputFileName = mapredReq.OutputName
+
 	// save so file to temp
 	soData := mapredReq.GetSoChunk().GetDataStream()
 	soFileName := mapredReq.GetSoChunk().GetFileName()
@@ -124,5 +129,46 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 				},
 			},
 		},
+	}
+}
+
+func sendGeneralResponse(resType string) {
+	resWrapper := &utility.Wrapper{
+		Msg: &utility.Wrapper_ResponseMsg{
+			ResponseMsg: &utility.Response{
+				Res: &utility.Response_GeneralRes{
+					GeneralRes: &utility.GeneralRes{
+						ResType: resType,
+					},
+				},
+			},
+		},
+	}
+
+	msgHandler.Send(resWrapper)
+	log.Printf("LOG: Send response to client -  %s\n", resType)
+	if resType == "complete" {
+		msgHandler.Close()
+	}
+}
+
+func sendGeneralResponseWithArgs(resType string, responseArg []string) {
+	resWrapper := &utility.Wrapper{
+		Msg: &utility.Wrapper_ResponseMsg{
+			ResponseMsg: &utility.Response{
+				Res: &utility.Response_GeneralRes{
+					GeneralRes: &utility.GeneralRes{
+						ResType:     resType,
+						ResponseArg: responseArg,
+					},
+				},
+			},
+		},
+	}
+
+	msgHandler.Send(resWrapper)
+	log.Printf("LOG: Send response to client-  %s,  %s\n", resType, responseArg)
+	if resType == "complete" {
+		msgHandler.Close()
 	}
 }

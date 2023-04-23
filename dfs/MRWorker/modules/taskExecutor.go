@@ -22,7 +22,7 @@ type context struct {
 
 type Task interface {
 	Init(args []string)
-	Map(index int, text string) ([]byte, []byte)
+	Map(index int, text string) ([][]byte, [][]byte)
 	Reduce(key []byte, values [][]byte) []byte
 	GetNumOfReducer() int
 }
@@ -164,7 +164,9 @@ func handleOneMapTask(chunkName string) string {
 	for scanner.Scan() {
 		line := scanner.Text()
 		key, value := mapRedTask.Map(i, line)
-		doPartition(key, value, partitionList)
+		for i := 0; i < len(key); i++ {
+			doPartition(key[i], value[i], partitionList)
+		}
 		i++
 	}
 	err = savePartitionFile(chunkName, partitionList)
@@ -215,6 +217,7 @@ func handleReduceTasks(req *utility.Request_RedTaskReq, msgHandler *utility.Mess
 	mapperHost := req.RedTaskReq.MapperHost
 	controllerHost := req.RedTaskReq.ControllerHost
 	totalChunkNum := int(req.RedTaskReq.NumOfChunks)
+	outputName := req.RedTaskReq.OutputName
 	log.Printf("LOG: Receive reduce task:%s, mapTaskId: %s, mapperHost: %s, totalChunkNum: %d \n", redTaskId, mapTaskId, mapperHost, totalChunkNum)
 	err := getPartitionFile(mapTaskId, redTaskId, mapperHost)
 	if err != nil {
@@ -225,7 +228,7 @@ func handleReduceTasks(req *utility.Request_RedTaskReq, msgHandler *utility.Mess
 	}
 	// wait until all map task has finished.
 	if len(partitionFileList) >= totalChunkNum {
-		outputFilename := fmt.Sprintf("%s_r%s", strings.SplitN(mapTaskId, "_", 2)[0], strings.Split(redTaskId, "p")[1])
+		outputFilename := fmt.Sprintf("%s_r%s", outputName, strings.Split(redTaskId, "p")[1])
 		res, filepath := runReduceTasks(outputFilename, controllerHost)
 		// TODO: send outputfile to controller
 		err := sendFileToDFS(filepath)
