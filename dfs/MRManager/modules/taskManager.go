@@ -4,6 +4,7 @@ import (
 	"dfs/utility"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"plugin"
 	"strconv"
@@ -13,7 +14,7 @@ import (
 
 type Task interface {
 	Init(args []string)
-	Map(index int, text string) ([]byte, []byte)
+	Map(index int, text string) ([][]byte, [][]byte)
 	Reduce(key []byte, values [][]byte) []byte
 	GetNumOfReducer() int
 }
@@ -24,10 +25,26 @@ type TaskStatus struct {
 }
 
 var (
-	mapMutex    sync.RWMutex
-	MapTasks    map[string]TaskStatus //key: chunk name,   value: TaskStatus
-	ReduceTasks map[string]TaskStatus //key: p1,  value: TaskStatus
+	mapMutex       sync.RWMutex
+	MapTasks       map[string]TaskStatus // key: chunk name,   value: TaskStatus
+	ReduceTasks    map[string]TaskStatus // key: p1,  value: TaskStatus
+	finishedMapNum int                   // count the number of finished map tasks
+	numLock        sync.RWMutex          // lock finishedMapNum
+	reportFreq     int                   // >= 1, report to client once every "reportFreq" map tasks are done
+	isJobFailed    bool                  // true: job failed, false: all good
 )
+
+func getFinishedMapNum() int {
+	numLock.RLock()
+	defer numLock.RUnlock()
+	return finishedMapNum
+}
+
+func increFinishedMapNum() {
+	numLock.Lock()
+	finishedMapNum++
+	numLock.Unlock()
+}
 
 func getMapTasks(key string) TaskStatus {
 	mapMutex.RLock()
@@ -106,8 +123,6 @@ func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 	}
 	// log.Println("LOG: nodeChunkMap: ", nodeChunkMap) // FIXME: testing only
 
-	nodeNum := len(nodeChunkMap)
-
 	// always assign the node with least options
 	// key: orion02:26521, value : assigned chunk array
 	mapAssignment := make(map[string][]string)
@@ -124,7 +139,7 @@ func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 			}
 			// if the node has been assigne more chunks than average
 			// skip it
-			if nodeAssignedChunkNum > assignedChunkNum/nodeNum {
+			if nodeAssignedChunkNum > getAvgJobNumOnNodes(nodeChunkMap, mapAssignment) {
 				continue
 			}
 			if len(value) < minLen {
@@ -178,6 +193,9 @@ func initTasks(mapredReq *utility.MapRedReq, filePath string) error {
 	// clear map
 	MapTasks = make(map[string]TaskStatus)
 	ReduceTasks = make(map[string]TaskStatus)
+	// clear count
+	finishedMapNum = 0
+
 	// test_4.bin_2-15.cnk: orion02:26521,orion07:26526,orion06:26525
 	chunkNodeList := mapredReq.GetInputFile().GetChunkNodeList()
 	// insert all the key of mapper
@@ -186,8 +204,11 @@ func initTasks(mapredReq *utility.MapRedReq, filePath string) error {
 		chunkName := temp[0]
 		MapTasks[chunkName] = TaskStatus{}
 	}
+
+	// set report frequency to the ceil of total map num / 10
+	reportFreq = int(math.Ceil(float64(len(MapTasks)) / float64(10)))
+
 	// insert all the key of reducer
-	// TODO: get the reducer number - DONE by steven
 	r, err := getNumOfRedTask(filePath)
 	if err != nil {
 		return err
@@ -326,6 +347,10 @@ func handleMapTaskReport(args []string) {
 		taskStatus := getMapTasks(mapTaskId)
 		taskStatus.Status = "completed"
 		setMapTasks(mapTaskId, taskStatus)
+
+		increFinishedMapNum()
+		sendReportToClient()
+
 		mapMutex.Lock()
 		for reducerId, reducerInfo := range ReduceTasks {
 			conn, err := createConnection(reducerInfo.Worker)
@@ -342,6 +367,7 @@ func handleMapTaskReport(args []string) {
 						MapperHost:     MapTasks[mapTaskId].Worker,
 						NumOfChunks:    uint32(len(MapTasks)),
 						ControllerHost: controllerHost,
+						OutputName:     OutputFileName,
 					},
 				},
 			}
@@ -384,5 +410,36 @@ func handleRedTaskReport(args []string) {
 	if checkRedJobDone() {
 		log.Printf("LOG: All reduce tasks completed. \n")
 		fmt.Printf("MapReduce job completed. \n")
+		sendGeneralResponse("complete")
+	}
+}
+
+// return the average number of job that has already been assigned to
+// the node which still have unsigned chunks,
+// i.e. get the node lists of nodeChunMap, and calculate their average assigned job numbers
+func getAvgJobNumOnNodes(nodeChunkMap map[string][]string, mapAssignment map[string][]string) int {
+	count := len(nodeChunkMap)
+	sum := 0
+	for key, _ := range nodeChunkMap {
+		if _, ok := mapAssignment[key]; !ok {
+			continue
+		}
+		sum += len(mapAssignment[key])
+	}
+	return sum / count
+}
+
+// if [finished map numbers] mod reportFreq == 0, then report the process
+// when all map finished, report map task completed
+func sendReportToClient() {
+	// map complete report
+	if getFinishedMapNum() == len(MapTasks) {
+		sendGeneralResponseWithArgs("report", []string{"Map tasks completed."})
+		return
+	}
+	// intermediate report
+	if getFinishedMapNum()%reportFreq == 0 {
+		resContext := fmt.Sprintf("Completed Map Tasks: %d / %d", getFinishedMapNum(), len(MapTasks))
+		sendGeneralResponseWithArgs("report", []string{resContext})
 	}
 }
