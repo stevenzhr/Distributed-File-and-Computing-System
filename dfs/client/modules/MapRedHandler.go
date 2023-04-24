@@ -93,22 +93,22 @@ func getMRResponse(mrMsgHandler *utility.MessageHandler) (bool, error) {
 		log.Printf("WARNING: Connection error receiving response from controller. (%s)\n", err.Error())
 		return true, err
 	}
-	resType := resWrapper.GetResponseMsg().GetGeneralRes().GetResType()
-	switch resType {
+	generalRes := resWrapper.GetResponseMsg().GetGeneralRes()
+	switch generalRes.GetResType() {
 	case "accept":
 		log.Println("LOG: MapReduce request accepted.")
 		return false, nil
 	case "report":
-		log.Printf("LOG: report - %s", resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()[0])
-		fmt.Println(resWrapper.GetResponseMsg().GetGeneralRes().GetResponseArg()[0])
+		log.Printf("LOG: report - %s", generalRes.GetResponseArg()[0])
+		fmt.Println(generalRes.GetResponseArg()[0])
 		return false, nil
 	case "complete":
 		log.Println("LOG: MapReduce job complete.")
 		fmt.Println("MapReduce job complete.")
 		return true, nil
 	case "deny":
-		log.Println("WARNING: MapReduce request denied by manager.")
-		fmt.Println("MapReduce request denied by manager.")
+		log.Println("ERROR: MapReduce request denied by manager. ", generalRes.GetResponseArg()[0])
+		fmt.Println("MapReduce request denied by manager. Error msg: ", generalRes.GetResponseArg()[0])
 		return true, nil
 	default:
 		log.Println("WARNING: Unknown error when package from controller.(Can't parse response type) ")

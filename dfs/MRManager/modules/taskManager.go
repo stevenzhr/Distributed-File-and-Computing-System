@@ -195,6 +195,7 @@ func initTasks(mapredReq *utility.MapRedReq, filePath string) error {
 	ReduceTasks = make(map[string]TaskStatus)
 	// clear count
 	finishedMapNum = 0
+	isJobFailed = false
 
 	// test_4.bin_2-15.cnk: orion02:26521,orion07:26526,orion06:26525
 	chunkNodeList := mapredReq.GetInputFile().GetChunkNodeList()
@@ -341,6 +342,10 @@ func handleTaskReport(req *utility.Request_GeneralReq) {
 func handleMapTaskReport(args []string) {
 	res := args[0]
 	mapTaskId := args[1]
+	// make sure mapReduce job is not failed
+	if isJobFailed {
+		return
+	}
 	// report all reducer, this map task is finished.
 	if res == "completed" {
 		log.Printf("LOG: Map task(%s) complete, report: %s. \n", mapTaskId, res)
@@ -390,6 +395,7 @@ func handleMapTaskReport(args []string) {
 		taskStatus := getMapTasks(mapTaskId)
 		taskStatus.Status = "fail"
 		setMapTasks(mapTaskId, taskStatus)
+		isJobFailed = true
 	}
 }
 
@@ -420,7 +426,7 @@ func handleRedTaskReport(args []string) {
 func getAvgJobNumOnNodes(nodeChunkMap map[string][]string, mapAssignment map[string][]string) int {
 	count := len(nodeChunkMap)
 	sum := 0
-	for key, _ := range nodeChunkMap {
+	for key := range nodeChunkMap {
 		if _, ok := mapAssignment[key]; !ok {
 			continue
 		}

@@ -40,30 +40,40 @@ func handleClientRequest() {
 	// start receive client request wrapper
 	wrapper, err := msgHandler.Receive()
 	if err != nil {
-		log.Println("WORNING: possible EOF. ", err.Error()) // FIXME:
+		log.Println("WORNING: possible EOF. ", err.Error())
 		return
 	}
 	// parse request
-	var resWrapper *utility.Wrapper
+	var generalRes *utility.GeneralRes
 	if msg, ok := wrapper.Msg.(*utility.Wrapper_RequestMsg); ok {
 		if req, ok := msg.RequestMsg.Req.(*utility.Request_MapredReq); ok {
-			resWrapper = handleMapredRequest(req.MapredReq)
+			generalRes = handleMapredRequest(req.MapredReq)
 		}
 	} else {
 		log.Println("WARNING: receive invalid request. ")
 		return
 	}
-	if resWrapper != nil {
+	if generalRes != nil {
+		resWrapper := &utility.Wrapper{
+			Msg: &utility.Wrapper_ResponseMsg{
+				ResponseMsg: &utility.Response{
+					Res: &utility.Response_GeneralRes{
+						GeneralRes: generalRes,
+					},
+				},
+			},
+		}
 		msgHandler.Send(resWrapper)
 		log.Println("LOG: Send response. ")
 	}
 }
 
-func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
+func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.GeneralRes {
 	fmt.Printf("Receive MapReduce task(%s) from client. \n", mapredReq.GetInputFile().GetFilename())
 	// assume accept response for now
 	generalRes := utility.GeneralRes{
-		ResType: "accept",
+		ResType:     "accept",
+		ResponseArg: []string{},
 	}
 	// save output file name
 	OutputFileName = mapredReq.OutputName
@@ -76,16 +86,17 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 	if err != nil {
 		log.Println("ERROR: Can't create or open temp folder. ", err)
 		fmt.Println("ERROR: Can't create or open temp folder. ", err)
-		return nil
+		generalRes.ResType = "deny"
+		generalRes.ResponseArg = append(generalRes.ResponseArg, "Can't create or open temp folder.")
+		return &generalRes
 	}
 	err = ioutil.WriteFile(soFilePath, soData, 0666)
 	if err != nil {
 		log.Println("ERROR: Can't create .so file. ", err)
 		fmt.Println("ERROR: Can't create .so file. ", err)
-		generalRes = utility.GeneralRes{
-			ResType: "deny",
-		}
-		return nil
+		generalRes.ResType = "deny"
+		generalRes.ResponseArg = append(generalRes.ResponseArg, "Can't create .so file.")
+		return &generalRes
 	}
 	// check the checksum of .so file
 	_, checksum, _ := utility.FileInfo(soFilePath)
@@ -93,9 +104,9 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 		os.Remove(soFilePath)
 		log.Println("ERROR: Checksum unmatched, delete local .so file. ")
 		log.Printf("LOG: Checksum: local(%s) vs req(%s) \n", checksum, mapredReq.GetSoChunk().GetChecksum())
-		generalRes = utility.GeneralRes{
-			ResType: "deny",
-		}
+		generalRes.ResType = "deny"
+		generalRes.ResponseArg = append(generalRes.ResponseArg, ".so file checksum unmatched. ")
+		return &generalRes
 	} else {
 		log.Printf("LOG: Successful retrieve .so file(%s). \n", soFileName)
 	}
@@ -105,7 +116,11 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 	// init map tasks
 	err = initTasks(mapredReq, soFilePath)
 	if err != nil {
-		// TODO: fail to init task, prepare rollback
+		// fail to init task, prepare rollback
+		log.Println("ERROR: Fail to init task, MapReduce job stop. ")
+		generalRes.ResType = "deny"
+		generalRes.ResponseArg = append(generalRes.ResponseArg, "Fail to init task. ")
+		return &generalRes
 	}
 	controllerHost = mapredReq.GetControllerHost()
 	log.Println("LOG: Finish init map & reduce task table. ")
@@ -114,22 +129,14 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.Wrapper {
 	updateReduceTasks(mapAssignment)
 	log.Println("LOG: Finish update reduce task table. ")
 
-	// TODO: add process map & reduce
+	// add process map & reduce
 	assignMapTasks(mapAssignment, mapredReq.GetSoChunk(), mapredReq.GetParameters())
 	log.Println("LOG: Finish assign map tasks to node. ")
 
 	// new a connection with workers
 	os.Remove(soFilePath)
 	// send request to workers
-	return &utility.Wrapper{
-		Msg: &utility.Wrapper_ResponseMsg{
-			ResponseMsg: &utility.Response{
-				Res: &utility.Response_GeneralRes{
-					GeneralRes: &generalRes,
-				},
-			},
-		},
-	}
+	return &generalRes
 }
 
 func sendGeneralResponse(resType string) {
@@ -146,7 +153,7 @@ func sendGeneralResponse(resType string) {
 	}
 
 	msgHandler.Send(resWrapper)
-	log.Printf("LOG: Send response to client -  %s\n", resType)
+	log.Printf("LOG: Send response to client -  \"%s\"\n", resType)
 	if resType == "complete" {
 		msgHandler.Close()
 	}
@@ -167,7 +174,7 @@ func sendGeneralResponseWithArgs(resType string, responseArg []string) {
 	}
 
 	msgHandler.Send(resWrapper)
-	log.Printf("LOG: Send response to client-  %s,  %s\n", resType, responseArg)
+	log.Printf("LOG: Send response to client -  \"%s\",  %s\n", resType, responseArg)
 	if resType == "complete" {
 		msgHandler.Close()
 	}
