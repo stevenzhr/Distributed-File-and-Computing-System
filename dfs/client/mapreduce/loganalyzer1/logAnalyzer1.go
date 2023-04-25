@@ -14,7 +14,7 @@ var (
 	r    int
 )
 
-// go build -buildmode=plugin -o la.so logAnalyzer.go
+// go build -buildmode=plugin -o la1.so logAnalyzer1.go
 
 func (t task) Init(strs []string) {
 	args = strs
@@ -23,7 +23,8 @@ func (t task) Init(strs []string) {
 
 func (t task) Map(index int, text string) ([][]byte, [][]byte) {
 	var keys, values [][]byte
-	words := strings.Split(text, " ")
+	// words := strings.Split(text, "\\s+")
+	words := strings.Fields(text)
 
 	re := regexp.MustCompile(`^https?://([^/]+)/`)
 
@@ -52,6 +53,10 @@ func (t task) Reduce(key []byte, values [][]byte) []byte {
 	}
 	context = []byte(fmt.Sprintf("%s,%d", keyStr, sum))
 	return context
+}
+
+func (t task) Compare(a, b string) bool {
+	return a < b
 }
 
 func (t task) GetNumOfReducer() int {

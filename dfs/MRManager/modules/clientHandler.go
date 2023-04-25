@@ -113,7 +113,7 @@ func handleMapredRequest(mapredReq *utility.MapRedReq) *utility.GeneralRes {
 
 	mapAssignment := assignNodeWithChunks(mapredReq)
 
-	// init map tasks
+	// init map and reduce tasks
 	err = initTasks(mapredReq, soFilePath)
 	if err != nil {
 		// fail to init task, prepare rollback

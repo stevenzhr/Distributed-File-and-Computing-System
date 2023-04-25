@@ -111,8 +111,8 @@ func getMRResponse(mrMsgHandler *utility.MessageHandler) (bool, error) {
 		fmt.Println("MapReduce request denied by manager. Error msg: ", generalRes.GetResponseArg()[0])
 		return true, nil
 	default:
-		log.Println("WARNING: Unknown error when package from controller.(Can't parse response type) ")
-		fmt.Println("Unknown error when package from controller.(Can't parse response type) ")
+		log.Println("WARNING: Unknown error when package from manager.(Can't parse response type) ")
+		fmt.Println("Unknown error when package from manager.(Can't parse response type) ")
 		return true, nil
 	}
 

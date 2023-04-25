@@ -75,7 +75,7 @@ func StoreFile(reqStr []string) bool {
 	// TODO: process special cases for .csv and .txt to get numOfChunk
 	var chunkNodeList []string
 	if ext := filepath.Ext(filename); ext == ".csv" || ext == ".txt" {
-		numOfChunk := getFileByLine(filename, fileSize, chunkSize)
+		numOfChunk := getFileByLine(path, fileSize, chunkSize)
 		chunkNodeList = make([]string, numOfChunk)
 		if chunkSize == 0 {
 			return true
@@ -138,9 +138,10 @@ func StoreFile(reqStr []string) bool {
 }
 
 // special process for csv & txt, read file line by line and calculate num of chunk
-func getFileByLine(fileName string, fileSize uint64, chunkSize int) int {
+func getFileByLine(filePath string, fileSize uint64, chunkSize int) int {
+	fileName := filepath.Base(filePath)
 	// TODO: fill the code
-	file, err := os.Open(fileName)
+	file, err := os.Open(filePath)
 	if err != nil {
 		log.Printf("ERROR: Can not open file(%s). %s\n", fileName, err)
 		fmt.Printf("Can not open file(%s). %s\n", fileName, err)
@@ -212,7 +213,7 @@ func sendTxtFile(fileName string, nodeHostList []string) {
 	wg.Wait()
 	//check if all results in channel are true
 	for i := 0; i < numOfChunk; i++ {
-		value, _ := <-ch
+		value := <-ch
 		if !value {
 			DeleteFile([]string{"delete", fileName})
 			break
@@ -269,7 +270,7 @@ func sendFile(path string, fileSize uint64, chunkSize int, nodeHostList []string
 	wg.Wait()
 	//check if all results in channel are true
 	for i := 0; i < numOfChunk; i++ {
-		value, _ := <-ch
+		value := <-ch
 		if !value {
 			DeleteFile([]string{"delete", filepath.Base(path)})
 			break
@@ -522,7 +523,7 @@ func getChunks(fileName string, fileChecksum string, fileSize int64, chunkSize i
 	success := true
 	// process fails if any of the thread fails
 	for i := 0; i < numOfChunk; i++ {
-		value, _ := <-ch
+		value := <-ch
 		if !value {
 			success = false
 			log.Printf("WARNING: Can't get file %s. Please try later. \n", fileName)
@@ -694,6 +695,11 @@ func getOneChunk(chunkName string, checksum string, size int64, pipingList []str
 
 		// check checksum, if right, change success
 		_, newCheckSum, err := utility.FileInfo(chunkPath)
+		if err != nil {
+			log.Println("WARNING: Can't get chunk file checksum. ", err.Error())
+			// fmt.Println("WARNING: Can't write chunk file. ", err.Error())
+			continue
+		}
 		if newCheckSum != checksum {
 			log.Println("WARNING: Checksum does not match. Try next candidate.")
 			// fmt.Println("WARNING: Checksum does not match. Try next candidate.")

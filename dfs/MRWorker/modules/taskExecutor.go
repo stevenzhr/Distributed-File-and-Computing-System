@@ -24,6 +24,7 @@ type Task interface {
 	Init(args []string)
 	Map(index int, text string) ([][]byte, [][]byte)
 	Reduce(key []byte, values [][]byte) []byte
+	Compare(a, b string) bool
 	GetNumOfReducer() int
 }
 
@@ -164,8 +165,8 @@ func handleOneMapTask(chunkName string) string {
 	for scanner.Scan() {
 		line := scanner.Text()
 		key, value := mapRedTask.Map(i, line)
-		for i := 0; i < len(key); i++ {
-			doPartition(key[i], value[i], partitionList)
+		for j := 0; j < len(key); j++ {
+			doPartition(key[j], value[j], partitionList)
 		}
 		i++
 	}
@@ -228,7 +229,7 @@ func handleReduceTasks(req *utility.Request_RedTaskReq, msgHandler *utility.Mess
 	}
 	// wait until all map task has finished.
 	if len(partitionFileList) >= totalChunkNum {
-		outputFilename := fmt.Sprintf("%s_r%s", outputName, strings.Split(redTaskId, "p")[1])
+		outputFilename := fmt.Sprintf("%s_r%s.txt", outputName, strings.Split(redTaskId, "p")[1])
 		res, filepath := runReduceTasks(outputFilename, controllerHost)
 		// TODO: send outputfile to controller
 		err := sendFileToDFS(filepath)
@@ -329,6 +330,10 @@ func runReduceTasks(outputFilename, controllerHost string) (string, string) {
 		}
 		// create scanner for each file
 		file, err := os.Open(filepath)
+		if err != nil {
+			log.Println("ERROR: Error opening file: ", err)
+			return "fail", ""
+		}
 		defer file.Close()
 		scannerArr[i] = *bufio.NewScanner(file)
 		// read first line to fill the buffered key-value array
@@ -337,12 +342,12 @@ func runReduceTasks(outputFilename, controllerHost string) (string, string) {
 		}
 	}
 	// finish sort all partition files, start shuffle
-	key, value := getMinKeyValue(bufferedKeyValueArr, scannerArr)
+	key, value := getOneKeyValuePair(bufferedKeyValueArr, scannerArr)
 	currentKey := key
 	valueArr := []string{value}
 	flag := true
 	for flag {
-		key, value := getMinKeyValue(bufferedKeyValueArr, scannerArr)
+		key, value := getOneKeyValuePair(bufferedKeyValueArr, scannerArr)
 		flag = key != ""
 		if key != currentKey {
 			// log.Printf("key: %s, valueArr: %s \n", currentKey, valueArr)
@@ -374,12 +379,12 @@ func runReduceTasks(outputFilename, controllerHost string) (string, string) {
 	return "completed", filepath
 }
 
-func getMinKeyValue(bufferedKeyValueArr [][]string, scannerArr []bufio.Scanner) (string, string) {
-	var i, minKeyIndex int
+func getOneKeyValuePair(bufferedKeyValueArr [][]string, scannerArr []bufio.Scanner) (string, string) {
+	var i, nextKeyIndex int // nextKeyIndex point to the index of partition file of the next key
 	// find first not null key's index
 	for i = 0; i < len(scannerArr); i++ {
 		if bufferedKeyValueArr[i][0] != "(n/a)" {
-			minKeyIndex = i
+			nextKeyIndex = i
 			break
 		}
 	}
@@ -392,24 +397,25 @@ func getMinKeyValue(bufferedKeyValueArr [][]string, scannerArr []bufio.Scanner) 
 		if bufferedKeyValueArr[i][0] == "(n/a)" {
 			remainScanner--
 			continue
-		} else if bufferedKeyValueArr[i][0] < bufferedKeyValueArr[minKeyIndex][0] {
-			minKeyIndex = i
+			// } else if bufferedKeyValueArr[i][0] < bufferedKeyValueArr[nextKeyIndex][0] {
+		} else if mapRedTask.Compare(bufferedKeyValueArr[i][0], bufferedKeyValueArr[nextKeyIndex][0]) {
+			nextKeyIndex = i
 		}
 	}
 	// finish go through all buffer and find min key
 	var key, value string
 	if remainScanner > 0 {
-		key = bufferedKeyValueArr[minKeyIndex][0]
-		value = bufferedKeyValueArr[minKeyIndex][1]
+		key = bufferedKeyValueArr[nextKeyIndex][0]
+		value = bufferedKeyValueArr[nextKeyIndex][1]
 	} else {
 		key = ""
 		value = ""
 	}
 	// update min key-value form file
-	if scannerArr[minKeyIndex].Scan() {
-		bufferedKeyValueArr[minKeyIndex] = strings.SplitN(scannerArr[minKeyIndex].Text(), "-->", 2)
+	if scannerArr[nextKeyIndex].Scan() {
+		bufferedKeyValueArr[nextKeyIndex] = strings.SplitN(scannerArr[nextKeyIndex].Text(), "-->", 2)
 	} else {
-		bufferedKeyValueArr[minKeyIndex] = []string{"(n/a)", ""}
+		bufferedKeyValueArr[nextKeyIndex] = []string{"(n/a)", ""}
 	}
 	return key, value
 }
@@ -432,7 +438,8 @@ func sortAfile(filename string) error {
 	file.Close()
 	// sort the array
 	sort.Slice(fileData, func(i, j int) bool {
-		return fileData[i][0] < fileData[j][0]
+		// return fileData[i][0] < fileData[j][0]
+		return mapRedTask.Compare(fileData[i][0], fileData[j][0])
 	})
 	// remove the original file
 	err = os.Remove(filename)

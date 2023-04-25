@@ -13,38 +13,45 @@ var (
 	r    int
 )
 
-// go build -buildmode=plugin -o wc.so wordCount.go
+// go build -buildmode=plugin -o la2.so logAnalyzer2.go
 
 func (t task) Init(strs []string) {
 	args = strs
-	r = 2
+	r = 1
 }
 
 func (t task) Map(index int, text string) ([][]byte, [][]byte) {
 	var keys, values [][]byte
-	words := strings.Split(text, " ")
+	line := strings.Split(text, ",")
 
-	for i := 0; i < len(words); i++ {
-		if words[i] == "" {
-			continue
-		}
-		keys = append(keys, []byte(words[i]))
-		values = append(values, []byte("1"))
-	}
+	keys = append(keys, []byte(line[1]))     //url
+	values = append(values, []byte(line[0])) //count
 
 	return keys, values
 }
 
 func (t task) Reduce(key []byte, values [][]byte) []byte {
 	var context []byte
+	totalOutput := 0
+
 	keyStr := string(key)
-	var sum int
+
 	for i := 0; i < len(values); i++ {
-		num, _ := strconv.Atoi(string(values[i]))
-		sum += num
+		if totalOutput >= 10 {
+			break
+		}
+
+		context = []byte(fmt.Sprintf("%s,%s", values[i], keyStr))
+		totalOutput++
 	}
-	context = []byte(fmt.Sprintf("%s,%d", keyStr, sum))
+
 	return context
+}
+
+func (t task) Compare(a, b string) bool {
+	keyA, _ := strconv.Atoi(a)
+	keyB, _ := strconv.Atoi(b)
+	return keyB < keyA
 }
 
 func (t task) GetNumOfReducer() int {

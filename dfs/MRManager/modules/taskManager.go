@@ -16,6 +16,7 @@ type Task interface {
 	Init(args []string)
 	Map(index int, text string) ([][]byte, [][]byte)
 	Reduce(key []byte, values [][]byte) []byte
+	Compare(a, b string) bool
 	GetNumOfReducer() int
 }
 
@@ -32,6 +33,7 @@ var (
 	numLock        sync.RWMutex          // lock finishedMapNum
 	reportFreq     int                   // >= 1, report to client once every "reportFreq" map tasks are done
 	isJobFailed    bool                  // true: job failed, false: all good
+	nodeCount      int                   // how many storage nodes are involved
 )
 
 func getFinishedMapNum() int {
@@ -121,6 +123,7 @@ func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 			nodeChunkMap[value[i]] = append(nodeChunkMap[value[i]], key)
 		}
 	}
+	nodeCount = len(nodeChunkMap)
 	// log.Println("LOG: nodeChunkMap: ", nodeChunkMap) // FIXME: testing only
 
 	// always assign the node with least options
@@ -137,12 +140,12 @@ func assignNodeWithChunks(mapredReq *utility.MapRedReq) *map[string][]string {
 			if _, ok := mapAssignment[key]; ok {
 				nodeAssignedChunkNum = len(mapAssignment[key])
 			}
-			// if the node has been assigne more chunks than average
+			// if the node has been assigned more chunks than average
 			// skip it
 			if nodeAssignedChunkNum > getAvgJobNumOnNodes(nodeChunkMap, mapAssignment) {
 				continue
 			}
-			if len(value) < minLen {
+			if len(value) <= minLen {
 				minLen = len(value)
 				minNode = key
 			}
@@ -209,11 +212,16 @@ func initTasks(mapredReq *utility.MapRedReq, filePath string) error {
 	// set report frequency to the ceil of total map num / 10
 	reportFreq = int(math.Ceil(float64(len(MapTasks)) / float64(10)))
 
-	// insert all the key of reducer
+	// get reducer number
 	r, err := getNumOfRedTask(filePath)
 	if err != nil {
 		return err
 	}
+	// reducer number must <= associated storage nodes number
+	if r > nodeCount {
+		r = nodeCount
+	}
+	// insert all the key of reducer
 	for i := 1; i <= r; i++ {
 		reducerName := "p" + strconv.Itoa(i)
 		ReduceTasks[reducerName] = TaskStatus{}

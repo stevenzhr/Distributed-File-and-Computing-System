@@ -83,7 +83,7 @@ func main() {
 			} else {
 				alive = ListNode(reqStrs)
 			}
-		case "mp":
+		case "mr":
 			if len(reqStrs) < 4 {
 				fmt.Println("Please input corrent mp command. [mp so_file_path input_name output_name parameter(optional)]")
 			} else {
