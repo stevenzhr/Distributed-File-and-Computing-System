@@ -1,4 +1,4 @@
-# Project 2: Distributed Computation Engine
+# Distributed File and Computation Engine
 
 ## How to run
 - The Distributed Computation Engine is run on top of the Distributed File System, so make sure to start the DFS first.
